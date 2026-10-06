@@ -17,21 +17,32 @@ export function ProjectsHeader({ onFilterChange, onCustomDateChange, onCreatePro
             description="Manage and track all construction projects"
             icon={LayoutGrid}
         >
-            <DateRangeFilter
-                initialFilter="yearly"
-                onFilterChange={onFilterChange}
-                onCustomDateChange={onCustomDateChange}
-            />
-
-            {!hideCreate && (
+            <div className="flex items-center gap-2">
                 <Button
-                    onClick={onCreateProject}
-                    className="gap-2 shadow-lg shadow-blue-100 h-10 bg-[#1D4F6D] hover:bg-[#0f2331] rounded-xl"
+                    onClick={() => {
+                        window.location.href = '/expenses?create=true';
+                    }}
+                    className="gap-2 shadow-lg shadow-blue-100 h-10 bg-white text-[#1D4F6D] border border-[#1D4F6D] hover:bg-gray-50 rounded-xl"
                 >
                     <Plus className="h-4 w-4" />
-                    Create Project
+                    Create Expense
                 </Button>
-            )}
+                <DateRangeFilter
+                    initialFilter="yearly"
+                    onFilterChange={onFilterChange}
+                    onCustomDateChange={onCustomDateChange}
+                />
+
+                {!hideCreate && (
+                    <Button
+                        onClick={onCreateProject}
+                        className="gap-2 shadow-lg shadow-blue-100 h-10 bg-[#1D4F6D] hover:bg-[#0f2331] rounded-xl"
+                    >
+                        <Plus className="h-4 w-4" />
+                        Create Project
+                    </Button>
+                )}
+            </div>
         </PageHeader>
     );
 }

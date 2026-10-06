@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import { useLocation } from 'react-router-dom';
 import { CheckCircle, XCircle, DollarSign, FileText, Search, ExternalLink, Loader2, Plus, Upload, RotateCcw, Edit2 } from 'lucide-react';
 import { Card } from '@/shared/components/ui/Card';
 import { Button } from '@/shared/components/ui/Button';
@@ -45,6 +46,7 @@ function normalizeStatus(rawStatus?: string): 'pending' | 'approved' | 'rejected
 }
 
 export function ExpensesPage() {
+    const location = useLocation();
     const [expenses, setExpenses] = useState<ExpenseItem[]>([]);
     const [projects, setProjects] = useState<ProjectOption[]>([]);
     const [selectedExpense, setSelectedExpense] = useState<ExpenseItem | null>(null);
@@ -235,7 +237,10 @@ export function ExpensesPage() {
     useEffect(() => {
         void fetchExpenses();
         void fetchProjects();
-    }, []);
+        if (new URLSearchParams(location.search).get('create') === 'true') {
+            setShowCreateModal(true);
+        }
+    }, [location.search]);
 
     const filteredExpenses = expenses.filter(expense => {
         const matchesSearch = expense.workerName.toLowerCase().includes(searchQuery.toLowerCase()) ||
