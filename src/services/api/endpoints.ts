@@ -146,6 +146,8 @@ export const API_ENDPOINTS = {
         DELETE: (id: string) => `/admin/reimbursement-expenses/${id}`,
         APPROVE: (id: string) => `/admin/reimbursement-expenses/${id}/approve`,
         REJECT: (id: string) => `/admin/reimbursement-expenses/${id}/reject`,
+        REQUEST_REVISION: (id: string) => `/admin/reimbursement-expenses/${id}/request-revision`,
+        SUBMIT: (id: string) => `/admin/reimbursement-expenses/${id}/submit`,
         MARK_PAID: (id: string) => `/admin/reimbursement-expenses/${id}/mark-paid`,
     },
 

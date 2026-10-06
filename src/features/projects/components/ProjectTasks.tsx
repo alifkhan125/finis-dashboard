@@ -224,7 +224,34 @@ export function ProjectTasks() {
                         </div>
                         <div className="space-y-4 pt-2">
                             <div className="space-y-2">
-                                <Label>Floors / Sections (Optional)</Label>
+                                <div className="flex justify-between items-center">
+                                    <Label>Floors / Sections (Optional)</Label>
+                                    {floors && floors.length > 0 && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                if (newTask.floorIds.length === floors.length) {
+                                                    setNewTask(prev => ({ ...prev, floorIds: [], unitIds: [] }));
+                                                } else {
+                                                    const allFloorIds = floors.map((f: any) => f.id);
+                                                    const validUnits = floors
+                                                        .flatMap((fl: any) => fl.rooms || fl.units || [])
+                                                        .map((u: any) => u.id);
+                                                    setNewTask(prev => ({ ...prev, floorIds: allFloorIds, unitIds: validUnits }));
+                                                }
+                                            }}
+                                            className="flex items-center gap-1.5 text-xs text-gray-700 hover:text-blue-700 font-medium transition-colors"
+                                        >
+                                            <span>Select All</span>
+                                            <input 
+                                                type="checkbox" 
+                                                className="w-3.5 h-3.5 cursor-pointer accent-blue-600" 
+                                                checked={newTask.floorIds.length > 0 && newTask.floorIds.length === floors.length} 
+                                                readOnly 
+                                            />
+                                        </button>
+                                    )}
+                                </div>
                                 <div className="flex flex-wrap gap-2">
                                     {floors?.map((f: any) => {
                                         const isSelected = newTask.floorIds.includes(f.id);
@@ -464,7 +491,31 @@ export function ProjectTasks() {
                                 />
                             </div>
                             <div className="space-y-2 col-span-2">
-                                <Label>Units *</Label>
+                                <div className="flex justify-between items-center">
+                                    <Label>Units *</Label>
+                                    {selectedTaskForSubTask?.taskUnits && selectedTaskForSubTask.taskUnits.length > 0 && (
+                                        <button
+                                            type="button"
+                                            onClick={() => {
+                                                const validUnits = selectedTaskForSubTask.taskUnits.filter((tu: any) => tu.unit).map((tu: any) => tu.unit.id);
+                                                if (newSubTask.unitIds.length === validUnits.length && validUnits.length > 0) {
+                                                    setNewSubTask(prev => ({ ...prev, unitIds: [] }));
+                                                } else {
+                                                    setNewSubTask(prev => ({ ...prev, unitIds: validUnits }));
+                                                }
+                                            }}
+                                            className="flex items-center gap-1.5 text-xs text-gray-700 hover:text-blue-700 font-medium transition-colors"
+                                        >
+                                            <span>Select All</span>
+                                            <input 
+                                                type="checkbox" 
+                                                className="w-3.5 h-3.5 cursor-pointer accent-blue-600" 
+                                                checked={newSubTask.unitIds.length > 0 && newSubTask.unitIds.length === selectedTaskForSubTask.taskUnits.filter((tu: any) => tu.unit).length} 
+                                                readOnly 
+                                            />
+                                        </button>
+                                    )}
+                                </div>
                                 <div className="flex flex-wrap gap-2">
                                     {selectedTaskForSubTask?.taskUnits?.map((tu: any) => {
                                         const u = tu.unit;

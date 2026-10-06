@@ -1,5 +1,5 @@
 import { useEffect, useState } from 'react';
-import { CheckCircle, XCircle, DollarSign, FileText, Search, ExternalLink, Loader2, Plus, Upload } from 'lucide-react';
+import { CheckCircle, XCircle, DollarSign, FileText, Search, ExternalLink, Loader2, Plus, Upload, RotateCcw, Edit2 } from 'lucide-react';
 import { Card } from '@/shared/components/ui/Card';
 import { Button } from '@/shared/components/ui/Button';
 import { Input } from '@/shared/components/ui/Input';
@@ -64,25 +64,103 @@ export function ExpensesPage() {
         category: 'Miscellaneous',
         paymentMethod: 'Cash',
         projectId: '',
+        vendor: '',
+        taskId: '',
+        subTaskId: '',
+        notes: '',
     });
+    const [projectTasks, setProjectTasks] = useState<any[]>([]);
     const [receiptFile, setReceiptFile] = useState<File | null>(null);
     const [isCreating, setIsCreating] = useState(false);
+
+    const handleProjectChange = async (projectId: string) => {
+        setNewExpense(prev => ({ ...prev, projectId, taskId: '', subTaskId: '' }));
+        if (!projectId) {
+            setProjectTasks([]);
+            return;
+        }
+        try {
+            const res = await apiClient.get<any>(`${API_ENDPOINTS.EXPENSES.PROJECTS}/${projectId}/tasks`);
+            const list = Array.isArray(res?.data?.data)
+                ? res.data.data
+                : (Array.isArray(res?.data) ? res.data : (Array.isArray(res) ? res : []));
+            setProjectTasks(list);
+        } catch {
+            setProjectTasks([]);
+        }
+    };
+
+    const [editingExpenseId, setEditingExpenseId] = useState<string | null>(null);
+
+    const handleEditClick = async (expense: ExpenseItem) => {
+        setEditingExpenseId(expense.id);
+        setNewExpense({
+            title: expense.description,
+            expenseDate: expense.date.split('T')[0],
+            subtotal: expense.subtotal,
+            tax: expense.tax,
+            totalAmount: expense.totalAmount,
+            category: expense.category,
+            paymentMethod: 'Cash',
+            projectId: expense.projectId || '',
+            vendor: '',
+            taskId: expense.taskId || '',
+            subTaskId: '',
+            notes: expense.description,
+        });
+
+        if (expense.projectId) {
+            try {
+                const res = await apiClient.get<any>(`${API_ENDPOINTS.EXPENSES.PROJECTS}/${expense.projectId}/tasks`);
+                const list = Array.isArray(res?.data?.data) ? res.data.data : (Array.isArray(res?.data) ? res.data : []);
+                setProjectTasks(list);
+            } catch {
+                setProjectTasks([]);
+            }
+        } else {
+            setProjectTasks([]);
+        }
+
+        setShowDetailModal(false);
+        setShowCreateModal(true);
+    };
 
     const handleCreateExpense = async (e: React.FormEvent) => {
         e.preventDefault();
         setIsCreating(true);
         try {
-            if (receiptFile) {
-                await apiClient.uploadFile(
-                    API_ENDPOINTS.EXPENSES.CREATE,
-                    receiptFile,
-                    { ...newExpense, action: 'SUBMITTED' },
-                    'receipt'
-                );
+            const payload: any = { ...newExpense };
+            if (!payload.taskId) delete payload.taskId;
+            if (!payload.subTaskId) delete payload.subTaskId;
+            if (!payload.projectId) delete payload.projectId;
+
+            if (editingExpenseId) {
+                if (receiptFile) {
+                    await apiClient.uploadFile(
+                        API_ENDPOINTS.EXPENSES.UPDATE(editingExpenseId),
+                        receiptFile,
+                        payload,
+                        'receipt',
+                        'PATCH'
+                    );
+                } else {
+                    await apiClient.patch(API_ENDPOINTS.EXPENSES.UPDATE(editingExpenseId), payload);
+                }
+                await apiClient.post(API_ENDPOINTS.EXPENSES.SUBMIT(editingExpenseId));
             } else {
-                await apiClient.post(API_ENDPOINTS.EXPENSES.CREATE, { ...newExpense, action: 'SUBMITTED' });
+                if (receiptFile) {
+                    await apiClient.uploadFile(
+                        API_ENDPOINTS.EXPENSES.CREATE,
+                        receiptFile,
+                        { ...payload, action: 'SUBMITTED' },
+                        'receipt'
+                    );
+                } else {
+                    await apiClient.post(API_ENDPOINTS.EXPENSES.CREATE, { ...payload, action: 'SUBMITTED' });
+                }
             }
             setShowCreateModal(false);
+            setEditingExpenseId(null);
             setNewExpense({
                 title: '',
                 expenseDate: new Date().toISOString().split('T')[0],
@@ -92,7 +170,12 @@ export function ExpensesPage() {
                 category: 'Miscellaneous',
                 paymentMethod: 'Cash',
                 projectId: '',
+                vendor: '',
+                taskId: '',
+                subTaskId: '',
+                notes: '',
             });
+            setProjectTasks([]);
             setReceiptFile(null);
             fetchExpenses();
         } catch (err) {
@@ -177,6 +260,10 @@ export function ExpensesPage() {
 
     const handleReject = async (reason: string) => {
         if (!selectedExpense) return;
+
+        const isConfirmed = window.confirm("আপনি কি এই খরচটি বাতিল (Reject) করতে চান? এটি বাতিল করলে আর এডিট বা রিভিশন করার কোনো সুযোগ থাকবে না এবং এটি আর কাউন্ট হবে না।\n\nAre you sure you want to permanently reject this expense? There will be no option to revise it later.");
+        if (!isConfirmed) return;
+
         setIsActionLoading(true);
         try {
             await apiClient.post(API_ENDPOINTS.EXPENSES.REJECT(selectedExpense.id), { comment: reason });
@@ -184,6 +271,20 @@ export function ExpensesPage() {
             setShowDetailModal(false);
         } catch (err) {
             console.error('Failed to reject expense:', err);
+        } finally {
+            setIsActionLoading(false);
+        }
+    };
+
+    const handleRequestRevision = async (reason: string) => {
+        if (!selectedExpense) return;
+        setIsActionLoading(true);
+        try {
+            await apiClient.post(API_ENDPOINTS.EXPENSES.REQUEST_REVISION(selectedExpense.id), { comment: reason });
+            setExpenses(prev => prev.map(e => e.id === selectedExpense.id ? { ...e, status: 'draft' as const, rejectionReason: reason } : e));
+            setShowDetailModal(false);
+        } catch (err) {
+            console.error('Failed to request revision:', err);
         } finally {
             setIsActionLoading(false);
         }
@@ -482,14 +583,32 @@ export function ExpensesPage() {
                                         Reject
                                     </Button>
                                     <Button
+                                        variant="outline"
+                                        className="text-orange-600 border-orange-200 hover:bg-orange-50 hover:text-orange-700"
+                                        disabled={isActionLoading}
+                                        onClick={() => handleRequestRevision('Revision requested by admin')}
+                                    >
+                                        <RotateCcw className="w-4 h-4 mr-2" />
+                                        Request Revision
+                                    </Button>
+                                    <Button
                                         disabled={isActionLoading}
                                         onClick={handleApprove}
-                                        className="bg-green-600 hover:bg-green-700"
+                                        className="bg-green-600 hover:bg-green-700 text-white"
                                     >
                                         <CheckCircle className="w-4 h-4 mr-2" />
                                         Approve
                                     </Button>
                                 </>
+                            )}
+                            {(selectedExpense.status === 'draft' || selectedExpense.status === 'rejected') && (
+                                <Button
+                                    className="bg-blue-600 hover:bg-blue-700 text-white"
+                                    onClick={() => handleEditClick(selectedExpense)}
+                                >
+                                    <Edit2 className="w-4 h-4 mr-2" />
+                                    Edit & Resubmit
+                                </Button>
                             )}
                         </div>
                     </div>
@@ -499,8 +618,11 @@ export function ExpensesPage() {
             {/* Create Expense Modal */}
             <Modal
                 isOpen={showCreateModal}
-                onClose={() => setShowCreateModal(false)}
-                title="Create New Expense"
+                onClose={() => {
+                    setShowCreateModal(false);
+                    setEditingExpenseId(null);
+                }}
+                title={editingExpenseId ? "Edit & Resubmit Expense" : "Create New Expense"}
             >
                 <form onSubmit={handleCreateExpense} className="space-y-4">
                     <div>
@@ -527,7 +649,7 @@ export function ExpensesPage() {
                             <Select
                                 required
                                 value={newExpense.projectId}
-                                onChange={e => setNewExpense({ ...newExpense, projectId: e.target.value })}
+                                onChange={e => handleProjectChange(e.target.value)}
                                 options={[
                                     { value: '', label: 'Select Project...' },
                                     ...projects.map(p => ({ value: p.id, label: p.name }))
@@ -535,6 +657,33 @@ export function ExpensesPage() {
                             />
                         </div>
                     </div>
+                    {newExpense.projectId && (
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Task / Subtask (Optional)</label>
+                            <Select
+                                value={newExpense.subTaskId ? `subtask_${newExpense.subTaskId}` : (newExpense.taskId ? `task_${newExpense.taskId}` : '')}
+                                onChange={e => {
+                                    const val = e.target.value;
+                                    if (!val) {
+                                        setNewExpense(prev => ({ ...prev, taskId: '', subTaskId: '' }));
+                                        return;
+                                    }
+                                    const [type, id] = val.split('_');
+                                    const item = projectTasks.find(pt => pt.type === type && pt.id === id);
+                                    if (item) {
+                                        setNewExpense(prev => ({ ...prev, taskId: item.taskId, subTaskId: item.subTaskId || '' }));
+                                    }
+                                }}
+                                options={[
+                                    { value: '', label: 'None' },
+                                    ...projectTasks.map(pt => ({
+                                        value: `${pt.type}_${pt.id}`,
+                                        label: pt.type === 'subtask' ? `↳ ${pt.title}` : pt.title
+                                    }))
+                                ]}
+                            />
+                        </div>
+                    )}
                     <div className="grid grid-cols-3 gap-4">
                         <div>
                             <label className="block text-sm font-medium text-gray-700 mb-1">Subtotal</label>
@@ -595,6 +744,24 @@ export function ExpensesPage() {
                             />
                         </div>
                     </div>
+                    <div className="grid grid-cols-2 gap-4">
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Vendor (Optional)</label>
+                            <Input
+                                value={newExpense.vendor}
+                                onChange={e => setNewExpense({ ...newExpense, vendor: e.target.value })}
+                                placeholder="e.g., Home Depot"
+                            />
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">Notes (Optional)</label>
+                            <Input
+                                value={newExpense.notes}
+                                onChange={e => setNewExpense({ ...newExpense, notes: e.target.value })}
+                                placeholder="Additional details..."
+                            />
+                        </div>
+                    </div>
                     <div>
                         <label className="block text-sm font-medium text-gray-700 mb-1">Receipt (Optional)</label>
                         <div className="flex items-center justify-center w-full">
@@ -615,11 +782,14 @@ export function ExpensesPage() {
                         </div>
                     </div>
                     <div className="flex justify-end gap-3 pt-4 border-t">
-                        <Button type="button" variant="outline" onClick={() => setShowCreateModal(false)}>
+                        <Button type="button" variant="outline" onClick={() => {
+                            setShowCreateModal(false);
+                            setEditingExpenseId(null);
+                        }}>
                             Cancel
                         </Button>
                         <Button type="submit" disabled={isCreating} className="bg-blue-600 hover:bg-blue-700 text-white">
-                            {isCreating ? 'Creating...' : 'Create Expense'}
+                            {isCreating ? (editingExpenseId ? 'Submitting...' : 'Creating...') : (editingExpenseId ? 'Save & Resubmit' : 'Create Expense')}
                         </Button>
                     </div>
                 </form>

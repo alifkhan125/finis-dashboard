@@ -182,7 +182,8 @@ class ApiClient {
         endpoint: string,
         file: File,
         additionalData?: Record<string, unknown>,
-        fileFieldName: string = 'file'
+        fileFieldName: string = 'file',
+        method: 'POST' | 'PUT' | 'PATCH' = 'POST'
     ): Promise<ApiResponse<T>> {
         const formData = new FormData();
         formData.append(fileFieldName, file);
@@ -200,7 +201,7 @@ class ApiClient {
 
         try {
             const response = await fetch(`${this.baseURL}${endpoint}`, {
-                method: 'POST',
+                method,
                 headers,
                 body: formData,
             });
