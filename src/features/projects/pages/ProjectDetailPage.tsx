@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { ChevronLeft, Calendar, Building2, Edit, FileBarChart, DollarSign, Users, CheckSquare, Home, Layout, Layers, Box, MapPin, Phone, Mail } from 'lucide-react';
+import { ChevronLeft, Calendar, Building2, Edit, FileBarChart, DollarSign, Users, CheckSquare, Home, Layout, Layers, Box, MapPin, Phone, Mail, Plus } from 'lucide-react';
 import { Button } from '@/shared/components/ui/Button';
 import { Badge } from '@/shared/components/ui/Badge';
 import { Tabs } from '@/shared/components/ui/Tabs';
@@ -17,6 +17,7 @@ import { StatCard } from '@/features/dashboard/components/StatCard';
 import { useProject, useUpdateProject, useProjectAnalysis, useProjectFloorPlan } from '../hooks';
 import { apiClient } from '@/services/api/client';
 import { Link as LinkIcon } from 'lucide-react';
+import { CreateExpenseModal } from '@/features/expenses/components/CreateExpenseModal';
 
 export function ProjectDetailPage() {
   const authUser = (() => {
@@ -30,7 +31,7 @@ export function ProjectDetailPage() {
   const isSuperAdmin = authUser?.role === 'super_admin';
   const { id } = useParams();
   const navigate = useNavigate();
-  const { data: project, isLoading } = useProject(id ?? '');
+  const { data: project, isLoading, refetch } = useProject(id ?? '');
   const { updateProject, isUpdating } = useUpdateProject();
   const { data: analysisData, isLoading: analysisLoading } = useProjectAnalysis(id ?? '');
   const { data: floorPlanData, isLoading: floorPlanLoading } = useProjectFloorPlan(id ?? '');
@@ -38,6 +39,7 @@ export function ProjectDetailPage() {
   const [isEditModalOpen, setIsEditModalOpen] = useState(false);
   const [isExportModalOpen, setIsExportModalOpen] = useState(false);
   const [isGeneratingLink, setIsGeneratingLink] = useState(false);
+  const [isCreateExpenseModalOpen, setIsCreateExpenseModalOpen] = useState(false);
   
   const handleGenerateLink = async () => {
     if (!project?.id) return;
@@ -191,6 +193,14 @@ export function ProjectDetailPage() {
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
+            <Button
+              variant="outline"
+              className="gap-2 h-11 px-5 border-blue-200 text-blue-600 hover:bg-blue-50 transition-all font-bold"
+              onClick={() => setIsCreateExpenseModalOpen(true)}
+            >
+              <Plus className="h-4 w-4" />
+              Create Expense
+            </Button>
             {!isSuperAdmin && (
               <Button
                 variant="outline"
@@ -520,6 +530,16 @@ export function ProjectDetailPage() {
           </div>
         </div>
       </Modal>
+
+      <CreateExpenseModal
+        isOpen={isCreateExpenseModalOpen}
+        onClose={() => setIsCreateExpenseModalOpen(false)}
+        defaultProjectId={project.id}
+        defaultProjectName={project.name}
+        onSuccess={() => {
+          refetch();
+        }}
+      />
     </div>
   );
 }

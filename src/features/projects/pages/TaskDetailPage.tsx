@@ -1,12 +1,14 @@
 import { useState } from 'react';
 import { useParams, useLocation, useNavigate } from 'react-router-dom';
 import { useTaskDetails, useSubTaskDetails, useReviewTaskApproval, useReviewSubTaskApproval, useReviewSubTaskReport, useDeleteSubTask, useReviewTaskCompletion } from '../hooks/useTasks';
+import { useProject } from '../hooks/useProjects';
 import { Badge } from '@/shared/components/ui/Badge';
 import { Button } from '@/shared/components/ui/Button';
-import { ArrowLeft, Clock, MapPin, User, FileText, CheckCircle, XCircle, Trash2, Flag, AlertCircle, Image, DollarSign, Package } from 'lucide-react';
+import { ArrowLeft, Clock, MapPin, User, FileText, CheckCircle, XCircle, Trash2, Flag, AlertCircle, Image, DollarSign, Package, Plus } from 'lucide-react';
 import { format } from 'date-fns';
 import { ROUTES } from '@/config/routes';
 import { config } from '@/config/env';
+import { CreateExpenseModal } from '@/features/expenses/components/CreateExpenseModal';
 
 function resolveMediaUrl(url?: string | null) {
     if (!url) return null;
@@ -30,15 +32,19 @@ export function TaskDetailPage() {
 
     const isSubtask = location.pathname.includes('/subtasks/');
 
-    const { data: taskDetails, isLoading: isTaskLoading } = useTaskDetails(!isSubtask ? taskId || null : null);
-    const { data: subTaskDetails, isLoading: isSubtaskLoading } = useSubTaskDetails(isSubtask ? taskId || null : null);
+    const { data: taskDetails, isLoading: isTaskLoading, refetch: refetchTask } = useTaskDetails(!isSubtask ? taskId || null : null);
+    const { data: subTaskDetails, isLoading: isSubtaskLoading, refetch: refetchSubTask } = useSubTaskDetails(isSubtask ? taskId || null : null);
 
     const data = isSubtask ? subTaskDetails : taskDetails;
     const isLoading = isSubtask ? isSubtaskLoading : isTaskLoading;
 
+    const resolvedProjectId = projectId || (isSubtask ? (subTaskDetails?.task?.projectId || subTaskDetails?.task?.project?.id || subTaskDetails?.projectId) : (taskDetails?.projectId || taskDetails?.project?.id));
+    const { data: project } = useProject(resolvedProjectId || '');
+
     const [reviewNote, setReviewNote] = useState('');
     const [completionNote, setCompletionNote] = useState('');
     const [isDeleteConfirm, setIsDeleteConfirm] = useState(false);
+    const [isCreateExpenseModalOpen, setIsCreateExpenseModalOpen] = useState(false);
 
     const { reviewTaskApproval, isReviewing: isReviewingTask } = useReviewTaskApproval();
     const { reviewSubTaskApproval, isReviewing: isReviewingSubTask } = useReviewSubTaskApproval();
@@ -220,6 +226,14 @@ export function TaskDetailPage() {
         ),
     ).join(', ') || 'Unassigned';
 
+    const effectiveProjectId = resolvedProjectId || projectId || (isSubtask ? (data.task?.projectId || data.task?.project?.id || data.projectId) : (data.projectId || data.project?.id));
+    const finalProjectName = (isSubtask ? data.task?.project?.name : data.project?.name) || data.projectName || project?.name;
+
+    const defaultTaskId = isSubtask ? (data.taskId || data.task?.id) : data.id;
+    const defaultTaskTitle = isSubtask ? data.task?.title : data.title;
+    const defaultSubTaskId = isSubtask ? data.id : undefined;
+    const defaultSubTaskTitle = isSubtask ? data.title : undefined;
+
     return (
         <div className="max-w-5xl mx-auto pb-16 space-y-5">
 
@@ -228,21 +242,30 @@ export function TaskDetailPage() {
                 <Button variant="outline" className="flex items-center gap-2" onClick={() => navigate(projectId ? `/projects/${projectId}` : ROUTES.PROJECTS)}>
                     <ArrowLeft className="w-4 h-4" /> Back to Project
                 </Button>
-                {isSubtask && (
-                    !isDeleteConfirm ? (
-                        <Button variant="outline" className="text-red-600 border-red-200 hover:bg-red-50 flex items-center gap-2" onClick={() => setIsDeleteConfirm(true)}>
-                            <Trash2 className="w-4 h-4" /> Delete Subtask
-                        </Button>
-                    ) : (
-                        <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
-                            <span className="text-sm text-red-700 font-medium">Confirm delete?</span>
-                            <Button className="bg-red-600 hover:bg-red-700 text-white text-xs h-7 px-3" onClick={handleDelete} disabled={isDeletingSubTask}>
-                                {isDeletingSubTask ? 'Deleting...' : 'Yes, Delete'}
+                <div className="flex items-center gap-3">
+                    <Button
+                        variant="outline"
+                        className="gap-2 border-blue-200 text-blue-600 hover:bg-blue-50 transition-all font-bold"
+                        onClick={() => setIsCreateExpenseModalOpen(true)}
+                    >
+                        <Plus className="w-4 h-4" /> Create Expense
+                    </Button>
+                    {isSubtask && (
+                        !isDeleteConfirm ? (
+                            <Button variant="outline" className="text-red-600 border-red-200 hover:bg-red-50 flex items-center gap-2" onClick={() => setIsDeleteConfirm(true)}>
+                                <Trash2 className="w-4 h-4" /> Delete Subtask
                             </Button>
-                            <Button variant="outline" className="text-xs h-7 px-3" onClick={() => setIsDeleteConfirm(false)}>Cancel</Button>
-                        </div>
-                    )
-                )}
+                        ) : (
+                            <div className="flex items-center gap-2 bg-red-50 border border-red-200 rounded-lg px-3 py-2">
+                                <span className="text-sm text-red-700 font-medium">Confirm delete?</span>
+                                <Button className="bg-red-600 hover:bg-red-700 text-white text-xs h-7 px-3" onClick={handleDelete} disabled={isDeletingSubTask}>
+                                    {isDeletingSubTask ? 'Deleting...' : 'Yes, Delete'}
+                                </Button>
+                                <Button variant="outline" className="text-xs h-7 px-3" onClick={() => setIsDeleteConfirm(false)}>Cancel</Button>
+                            </div>
+                        )
+                    )}
+                </div>
             </div>
 
             {/* Header Card */}
@@ -487,6 +510,21 @@ export function TaskDetailPage() {
                     </div>
                 )}
             </div>
+
+            <CreateExpenseModal
+                isOpen={isCreateExpenseModalOpen}
+                onClose={() => setIsCreateExpenseModalOpen(false)}
+                defaultProjectId={effectiveProjectId}
+                defaultProjectName={finalProjectName}
+                defaultTaskId={defaultTaskId}
+                defaultTaskTitle={defaultTaskTitle}
+                defaultSubTaskId={defaultSubTaskId}
+                defaultSubTaskTitle={defaultSubTaskTitle}
+                onSuccess={() => {
+                    if (isSubtask) refetchSubTask();
+                    else refetchTask();
+                }}
+            />
 
         </div>
     );
