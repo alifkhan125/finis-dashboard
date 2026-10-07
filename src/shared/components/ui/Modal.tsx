@@ -10,6 +10,7 @@ interface ModalProps {
   children: React.ReactNode;
   className?: string;
   maxWidth?: 'sm' | 'md' | 'lg' | 'xl' | '2xl' | '5xl' | '6xl';
+  zIndex?: number;
 }
 
 export function Modal({
@@ -18,7 +19,8 @@ export function Modal({
   title,
   children,
   className,
-  maxWidth = 'md'
+  maxWidth = 'md',
+  zIndex
 }: ModalProps) {
   const modalRef = useRef<HTMLDivElement>(null);
 
@@ -96,6 +98,7 @@ export function Modal({
 
   return (
     <div
+      style={zIndex ? { zIndex } : undefined}
       className="fixed inset-0 z-[100] flex items-start sm:items-center justify-center bg-[#020617]/70 backdrop-blur-sm p-4 overflow-y-auto animate-in fade-in duration-300"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();

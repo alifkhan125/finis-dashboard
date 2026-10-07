@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react';
 import { useLocation } from 'react-router-dom';
-import { CheckCircle, XCircle, DollarSign, FileText, Search, ExternalLink, Loader2, Plus, Upload, RotateCcw, Edit2 } from 'lucide-react';
+import { CheckCircle, XCircle, DollarSign, FileText, Search, ExternalLink, Loader2, Plus, Upload, RotateCcw, Edit2, AlertTriangle } from 'lucide-react';
 import { Card } from '@/shared/components/ui/Card';
 import { Button } from '@/shared/components/ui/Button';
 import { Input } from '@/shared/components/ui/Input';
@@ -55,6 +55,8 @@ export function ExpensesPage() {
     const [statusFilter, setStatusFilter] = useState('all');
     const [isLoading, setIsLoading] = useState(false);
     const [isActionLoading, setIsActionLoading] = useState(false);
+    const [showRejectConfirmModal, setShowRejectConfirmModal] = useState(false);
+    const [rejectReason, setRejectReason] = useState('Not approved');
 
     const [showCreateModal, setShowCreateModal] = useState(false);
     const [newExpense, setNewExpense] = useState({
@@ -263,16 +265,20 @@ export function ExpensesPage() {
         }
     };
 
-    const handleReject = async (reason: string) => {
+    const openRejectConfirmModal = () => {
+        setRejectReason('Not approved');
+        setShowRejectConfirmModal(true);
+    };
+
+    const handleConfirmReject = async () => {
         if (!selectedExpense) return;
 
-        const isConfirmed = window.confirm("আপনি কি এই খরচটি বাতিল (Reject) করতে চান? এটি বাতিল করলে আর এডিট বা রিভিশন করার কোনো সুযোগ থাকবে না এবং এটি আর কাউন্ট হবে না।\n\nAre you sure you want to permanently reject this expense? There will be no option to revise it later.");
-        if (!isConfirmed) return;
-
         setIsActionLoading(true);
+        const reason = rejectReason.trim() || 'Not approved';
         try {
             await apiClient.post(API_ENDPOINTS.EXPENSES.REJECT(selectedExpense.id), { comment: reason });
             setExpenses(prev => prev.map(e => e.id === selectedExpense.id ? { ...e, status: 'rejected' as const, rejectionReason: reason } : e));
+            setShowRejectConfirmModal(false);
             setShowDetailModal(false);
         } catch (err) {
             console.error('Failed to reject expense:', err);
@@ -582,7 +588,7 @@ export function ExpensesPage() {
                                     <Button
                                         variant="destructive"
                                         disabled={isActionLoading}
-                                        onClick={() => handleReject('Not approved')}
+                                        onClick={openRejectConfirmModal}
                                     >
                                         <XCircle className="w-4 h-4 mr-2" />
                                         Reject
@@ -619,6 +625,94 @@ export function ExpensesPage() {
                     </div>
                 </Modal>
             )}
+
+            {/* Custom Reject Expense Confirmation Modal */}
+            <Modal
+                isOpen={showRejectConfirmModal}
+                onClose={() => {
+                    if (!isActionLoading) {
+                        setShowRejectConfirmModal(false);
+                    }
+                }}
+                title="Reject Expense"
+                maxWidth="md"
+                zIndex={120}
+            >
+                <div className="space-y-5 text-center sm:text-left">
+                    <div className="flex flex-col sm:flex-row items-center sm:items-start gap-4">
+                        <div className="w-12 h-12 rounded-2xl bg-red-100 flex items-center justify-center shrink-0">
+                            <AlertTriangle className="w-6 h-6 text-red-600" />
+                        </div>
+                        <div className="space-y-1">
+                            <h4 className="text-base font-bold text-gray-900">
+                                Permanently Reject this Expense?
+                            </h4>
+                            <p className="text-sm text-gray-500 leading-relaxed">
+                                Are you sure you want to permanently reject this expense? Once rejected, it cannot be edited or resubmitted, and it will not count towards project spending.
+                            </p>
+                        </div>
+                    </div>
+
+                    {selectedExpense && (
+                        <div className="bg-gray-50 rounded-xl p-3.5 border border-gray-100 text-sm space-y-1 text-left">
+                            <div className="flex justify-between">
+                                <span className="text-gray-500">Expense:</span>
+                                <span className="font-semibold text-gray-800">{selectedExpense.description}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-gray-500">Amount:</span>
+                                <span className="font-semibold text-gray-900">${(selectedExpense.totalAmount ?? selectedExpense.amount ?? 0).toFixed(2)}</span>
+                            </div>
+                            <div className="flex justify-between">
+                                <span className="text-gray-500">Worker:</span>
+                                <span className="font-medium text-gray-700">{selectedExpense.workerName}</span>
+                            </div>
+                        </div>
+                    )}
+
+                    <div className="text-left">
+                        <label className="block text-xs font-bold text-gray-500 uppercase tracking-wider mb-1.5">
+                            Rejection Reason
+                        </label>
+                        <Input
+                            value={rejectReason}
+                            onChange={e => setRejectReason(e.target.value)}
+                            placeholder="e.g., Not approved, invalid receipt, policy violation"
+                            disabled={isActionLoading}
+                        />
+                    </div>
+
+                    <div className="flex justify-end gap-3 pt-3 border-t border-gray-100">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() => setShowRejectConfirmModal(false)}
+                            disabled={isActionLoading}
+                        >
+                            Cancel
+                        </Button>
+                        <Button
+                            type="button"
+                            variant="destructive"
+                            disabled={isActionLoading}
+                            onClick={handleConfirmReject}
+                            className="bg-red-600 hover:bg-red-700 text-white font-bold"
+                        >
+                            {isActionLoading ? (
+                                <>
+                                    <Loader2 className="w-4 h-4 mr-2 animate-spin" />
+                                    Rejecting...
+                                </>
+                            ) : (
+                                <>
+                                    <XCircle className="w-4 h-4 mr-1.5" />
+                                    Reject Expense
+                                </>
+                            )}
+                        </Button>
+                    </div>
+                </div>
+            </Modal>
 
             {/* Create Expense Modal */}
             <Modal
