@@ -3,15 +3,22 @@ import type { ReactNode, FormEvent } from 'react';
 import {
   Archive,
   Boxes,
+  Building2,
+  CalendarDays,
   CheckCircle2,
   CircleOff,
+  DollarSign,
+  FileText,
   FolderTree,
+  Home,
   Layers3,
   ListFilter,
+  Mail,
   Plus,
   Search,
   Sparkles,
   Tags,
+  Trash2,
   Wrench,
 } from 'lucide-react';
 import { SEO } from '@/shared/components/seo/SEO';
@@ -31,24 +38,94 @@ import { cn } from '@/shared/utils';
 import {
   QuoteSelectorOption,
   QuoteMeasurementType,
+  QuoteRecord,
   QuoteWorkCategory,
   QuoteWorkItem,
+  useCreateQuoteMutation,
   useCreateQuoteMeasurementTypeMutation,
   useCreateQuoteWorkCategoryMutation,
   useCreateQuoteWorkItemMutation,
+  useDeleteQuoteMutation,
   useDisableQuoteWorkCategoryMutation,
   useDisableQuoteMeasurementTypeMutation,
   useDisableQuoteWorkItemMutation,
+  useGetQuotesQuery,
   useGetQuoteSelectorsQuery,
   useGetQuoteMeasurementTypesQuery,
   useGetQuoteWorkCategoriesQuery,
   useGetQuoteWorkItemsQuery,
+  useUpdateQuoteMutation,
   useUpdateQuoteWorkCategoryMutation,
   useUpdateQuoteMeasurementTypeMutation,
   useUpdateQuoteWorkItemMutation,
 } from '@/store/quotesApi';
 
-type TabId = 'overview' | 'categories' | 'measurements' | 'items';
+type TabId = 'builder' | 'overview' | 'quotes' | 'categories' | 'measurements' | 'items';
+
+type BuilderStep = 1 | 2 | 3;
+
+interface BuilderInfo {
+  clientName: string;
+  projectAddress: string;
+  phoneNumber: string;
+  email: string;
+  estimatedTime: string;
+  projectType: string;
+  propertyType: string;
+  unitType: string;
+}
+
+interface BuilderItem {
+  id: string;
+  title: string;
+  quantity: string;
+  unit: string;
+  unitPrice: string;
+  categoryName: string;
+  workItemId?: string;
+}
+
+interface QuoteDraft {
+  workItemId: string;
+  projectType: string;
+  propertyType: string;
+  unitType: string;
+  title: string;
+  quantity: string;
+  unit: string;
+  unitPrice: string;
+  notes: string;
+  isCustom: boolean;
+}
+
+interface BuilderItemDraft {
+  workItemId: string;
+  title: string;
+  quantity: string;
+  unit: string;
+  unitPrice: string;
+  categoryName: string;
+}
+
+const EMPTY_BUILDER_INFO: BuilderInfo = {
+  clientName: '',
+  projectAddress: '',
+  phoneNumber: '',
+  email: '',
+  estimatedTime: '',
+  projectType: 'new_build',
+  propertyType: 'residential',
+  unitType: 'apartment',
+};
+
+const EMPTY_BUILDER_ITEM_DRAFT: BuilderItemDraft = {
+  workItemId: '',
+  title: '',
+  quantity: '1',
+  unit: '',
+  unitPrice: '',
+  categoryName: 'Custom Items',
+};
 
 interface CategoryDraft {
   name: string;
@@ -81,6 +158,19 @@ const EMPTY_CATEGORY_DRAFT: CategoryDraft = {
   description: '',
   sortOrder: '0',
   isActive: true,
+};
+
+const EMPTY_QUOTE_DRAFT: QuoteDraft = {
+  workItemId: '',
+  projectType: '',
+  propertyType: '',
+  unitType: '',
+  title: '',
+  quantity: '1',
+  unit: '',
+  unitPrice: '',
+  notes: '',
+  isCustom: true,
 };
 
 const EMPTY_ITEM_DRAFT: ItemDraft = {
@@ -137,7 +227,12 @@ function QuoteFormModal({
 }
 
 export function QuoteLibraryPage() {
-  const [activeTab, setActiveTab] = useState<TabId>('overview');
+  const [activeTab, setActiveTab] = useState<TabId>('builder');
+  const [builderStep, setBuilderStep] = useState<BuilderStep>(1);
+  const [builderInfo, setBuilderInfo] = useState<BuilderInfo>(EMPTY_BUILDER_INFO);
+  const [builderItems, setBuilderItems] = useState<BuilderItem[]>([]);
+  const [builderItemDraft, setBuilderItemDraft] = useState<BuilderItemDraft>(EMPTY_BUILDER_ITEM_DRAFT);
+  const [builderItemModalOpen, setBuilderItemModalOpen] = useState(false);
   const [includeInactive, setIncludeInactive] = useState(false);
   const [categorySearch, setCategorySearch] = useState('');
   const [measurementSearch, setMeasurementSearch] = useState('');
@@ -168,7 +263,16 @@ export function QuoteLibraryPage() {
     unitType: unitTypeFilter || undefined,
     includeInactive,
   });
+  const { data: quoteList, isLoading: quotesLoading } = useGetQuotesQuery({
+    projectType: projectTypeFilter || undefined,
+    propertyType: propertyTypeFilter || undefined,
+    unitType: unitTypeFilter || undefined,
+  });
+  const quotes = quoteList?.quotes ?? [];
 
+  const [createQuote, { isLoading: isCreatingQuote }] = useCreateQuoteMutation();
+  const [updateQuote, { isLoading: isUpdatingQuote }] = useUpdateQuoteMutation();
+  const [deleteQuote] = useDeleteQuoteMutation();
   const [createCategory, { isLoading: isCreatingCategory }] = useCreateQuoteWorkCategoryMutation();
   const [updateCategory, { isLoading: isUpdatingCategory }] = useUpdateQuoteWorkCategoryMutation();
   const [disableCategory] = useDisableQuoteWorkCategoryMutation();
@@ -180,12 +284,15 @@ export function QuoteLibraryPage() {
   const [disableItem] = useDisableQuoteWorkItemMutation();
 
   const [categoryModalOpen, setCategoryModalOpen] = useState(false);
+  const [quoteModalOpen, setQuoteModalOpen] = useState(false);
   const [measurementModalOpen, setMeasurementModalOpen] = useState(false);
   const [itemModalOpen, setItemModalOpen] = useState(false);
+  const [editingQuote, setEditingQuote] = useState<QuoteRecord | null>(null);
   const [editingCategory, setEditingCategory] = useState<QuoteWorkCategory | null>(null);
   const [editingMeasurement, setEditingMeasurement] = useState<QuoteMeasurementType | null>(null);
   const [editingItem, setEditingItem] = useState<QuoteWorkItem | null>(null);
   const [categoryDraft, setCategoryDraft] = useState<CategoryDraft>(EMPTY_CATEGORY_DRAFT);
+  const [quoteDraft, setQuoteDraft] = useState<QuoteDraft>(EMPTY_QUOTE_DRAFT);
   const [measurementDraft, setMeasurementDraft] = useState<MeasurementDraft>(EMPTY_MEASUREMENT_DRAFT);
   const [itemDraft, setItemDraft] = useState<ItemDraft>(EMPTY_ITEM_DRAFT);
 
@@ -195,6 +302,25 @@ export function QuoteLibraryPage() {
     unitTypes: [],
     measurementTypes: [],
   };
+
+  const builderSubtotal = useMemo(
+    () =>
+      builderItems.reduce(
+        (total, item) => total + Number(item.quantity || 0) * Number(item.unitPrice || 0),
+        0,
+      ),
+    [builderItems],
+  );
+
+  const quoteValidUntil = useMemo(() => {
+    const date = new Date();
+    date.setDate(date.getDate() + 2);
+    return date.toLocaleDateString('en-US', {
+      month: 'long',
+      day: 'numeric',
+      year: 'numeric',
+    });
+  }, []);
 
   const activeCategories = useMemo(
     () => categories.filter((category) => category.isActive).length,
@@ -210,11 +336,163 @@ export function QuoteLibraryPage() {
   );
 
   const overviewCards = [
+    { label: 'Quotes', value: quoteList?.total ?? quotes.length, hint: 'Saved records', icon: Archive },
     { label: 'Work Categories', value: categories.length, hint: `${activeCategories} active`, icon: FolderTree },
     { label: 'Work Items', value: items.length, hint: `${activeItems} active`, icon: Boxes },
     { label: 'Selector Sets', value: '8', hint: 'Project + property + unit', icon: Layers3 },
     { label: 'Measurement Types', value: measurementTypes.length, hint: `${activeMeasurementTypes} active`, icon: Wrench },
   ];
+
+  const setBuilderField = (field: keyof BuilderInfo, value: string) => {
+    setBuilderInfo((current) => ({ ...current, [field]: value }));
+    if (field === 'projectType' || field === 'propertyType' || field === 'unitType') {
+      setBuilderItems([]);
+    }
+  };
+
+  const applyBuilderWorkItem = (workItemId: string) => {
+    const selectedItem = items.find((item) => item.id === workItemId);
+    setBuilderItemDraft((draft) => ({
+      ...draft,
+      workItemId,
+      ...(selectedItem
+        ? {
+            title: selectedItem.name,
+            unit: selectedItem.measurementType,
+            unitPrice: selectedItem.unitCost === null || selectedItem.unitCost === undefined ? draft.unitPrice : String(selectedItem.unitCost),
+            categoryName: selectedItem.category?.name ?? draft.categoryName,
+          }
+        : {}),
+    }));
+  };
+
+  const openBuilderItemModal = () => {
+    setBuilderItemDraft(EMPTY_BUILDER_ITEM_DRAFT);
+    setBuilderItemModalOpen(true);
+  };
+
+  const handleAddBuilderItem = () => {
+    if (!builderItemDraft.title.trim()) return;
+    const item: BuilderItem = {
+      id: builderItemDraft.workItemId || `custom-${Date.now()}`,
+      workItemId: builderItemDraft.workItemId || undefined,
+      title: builderItemDraft.title.trim(),
+      quantity: builderItemDraft.quantity || '1',
+      unit: builderItemDraft.unit.trim() || 'each',
+      unitPrice: builderItemDraft.unitPrice || '0',
+      categoryName: builderItemDraft.categoryName || 'Custom Items',
+    };
+    setBuilderItems((current) => [...current, item]);
+    setBuilderItemDraft(EMPTY_BUILDER_ITEM_DRAFT);
+    setBuilderItemModalOpen(false);
+  };
+
+  const handleGenerateBuilderQuote = async () => {
+    if (!builderInfo.clientName.trim() || !builderInfo.projectAddress.trim() || builderItems.length === 0) return;
+
+    await Promise.all(
+      builderItems.map((item) =>
+        createQuote({
+          workItemId: item.workItemId,
+          projectType: builderInfo.projectType,
+          propertyType: builderInfo.propertyType,
+          unitType: builderInfo.unitType,
+          title: item.title,
+          quantity: Number(item.quantity || 1),
+          unit: item.unit,
+          unitPrice: Number(item.unitPrice || 0),
+          notes: [
+            `Client: ${builderInfo.clientName}`,
+            `Address: ${builderInfo.projectAddress}`,
+            builderInfo.phoneNumber ? `Phone: ${builderInfo.phoneNumber}` : '',
+            builderInfo.email ? `Email: ${builderInfo.email}` : '',
+            builderInfo.estimatedTime ? `Time: ${builderInfo.estimatedTime}` : '',
+          ].filter(Boolean).join('\n'),
+          isCustom: !item.workItemId,
+        }).unwrap(),
+      ),
+    );
+
+    window.print();
+  };
+
+  const openCreateQuote = () => {
+    setEditingQuote(null);
+    setQuoteDraft(EMPTY_QUOTE_DRAFT);
+    setQuoteModalOpen(true);
+  };
+
+  const openEditQuote = (quote: QuoteRecord) => {
+    setEditingQuote(quote);
+    setQuoteDraft({
+      workItemId: quote.workItemId ?? '',
+      projectType: quote.projectType ?? '',
+      propertyType: quote.propertyType ?? '',
+      unitType: quote.unitType ?? '',
+      title: quote.title ?? '',
+      quantity: String(quote.quantity ?? 1),
+      unit: quote.unit ?? quote.measurementType ?? '',
+      unitPrice: String(quote.unitPrice ?? ''),
+      notes: quote.notes ?? '',
+      isCustom: quote.isCustom ?? false,
+    });
+    setQuoteModalOpen(true);
+  };
+
+  const applyQuoteWorkItem = (workItemId: string) => {
+    const selectedItem = items.find((item) => item.id === workItemId);
+    setQuoteDraft((draft) => ({
+      ...draft,
+      workItemId,
+      isCustom: !workItemId,
+      ...(selectedItem
+        ? {
+            projectType: selectedItem.projectType,
+            propertyType: selectedItem.propertyType,
+            unitType: selectedItem.unitType,
+            title: selectedItem.name,
+            unit: selectedItem.measurementType,
+            unitPrice: selectedItem.unitCost === null || selectedItem.unitCost === undefined ? draft.unitPrice : String(selectedItem.unitCost),
+          }
+        : {}),
+    }));
+  };
+
+  const handleQuoteSubmit = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const payload = {
+      workItemId: quoteDraft.workItemId || undefined,
+      projectType: quoteDraft.projectType,
+      propertyType: quoteDraft.propertyType,
+      unitType: quoteDraft.unitType,
+      title: quoteDraft.title.trim(),
+      quantity: Number(quoteDraft.quantity || 1),
+      unit: quoteDraft.unit.trim() || undefined,
+      unitPrice: Number(quoteDraft.unitPrice || 0),
+      notes: quoteDraft.notes.trim() || undefined,
+      isCustom: quoteDraft.isCustom,
+    };
+
+    if (!payload.projectType || !payload.propertyType || !payload.unitType || !payload.title || payload.quantity <= 0) {
+      return;
+    }
+
+    if (editingQuote?.id) {
+      await updateQuote({ id: editingQuote.id, data: payload }).unwrap();
+    } else {
+      await createQuote(payload).unwrap();
+    }
+
+    setQuoteModalOpen(false);
+    setEditingQuote(null);
+    setQuoteDraft(EMPTY_QUOTE_DRAFT);
+  };
+
+  const handleDeleteQuote = async (quote: QuoteRecord) => {
+    if (!quote?.id) return;
+    if (!window.confirm(`Delete quote "${quote.title}"?`)) return;
+    await deleteQuote(quote.id).unwrap();
+  };
 
   const openCreateCategory = () => {
     setEditingCategory(null);
@@ -380,6 +658,72 @@ export function QuoteLibraryPage() {
     await disableItem(item.id).unwrap();
   };
 
+  const quoteColumns: Column<QuoteRecord>[] = [
+    {
+      key: 'title',
+      header: 'Quote',
+      render: (quote) => (
+        <div className="space-y-1">
+          <div className="font-semibold text-gray-900">{quote.title}</div>
+          <div className="text-xs text-gray-500">{quote.workItem?.name ?? quote.notes ?? 'No linked work item'}</div>
+        </div>
+      ),
+    },
+    {
+      key: 'selectors',
+      header: 'Selectors',
+      render: (quote) => (
+        <div className="space-y-1 text-xs font-medium text-gray-600">
+          <div>{normalizeText(quote.projectType)}</div>
+          <div>{normalizeText(quote.propertyType)}</div>
+          <div>{normalizeText(quote.unitType)}</div>
+        </div>
+      ),
+    },
+    {
+      key: 'quantity',
+      header: 'Qty',
+      render: (quote) => (
+        <span className="font-medium text-gray-700">
+          {quote.quantity} {quote.unit || quote.measurementType || ''}
+        </span>
+      ),
+    },
+    {
+      key: 'unitPrice',
+      header: 'Unit Price',
+      render: (quote) => <span className="font-medium text-gray-700">{formatMoney(quote.unitPrice)}</span>,
+    },
+    {
+      key: 'subtotal',
+      header: 'Subtotal',
+      render: (quote) => <span className="font-black text-gray-900">{formatMoney(quote.subtotal)}</span>,
+    },
+    {
+      key: 'type',
+      header: 'Type',
+      render: (quote) => (
+        <Badge className={cn(quote.isCustom ? 'bg-amber-50 text-amber-700' : 'bg-emerald-50 text-emerald-700')}>
+          {quote.isCustom ? 'Custom' : 'Library'}
+        </Badge>
+      ),
+    },
+    {
+      key: 'actions',
+      header: 'Actions',
+      render: (quote) => (
+        <div className="flex gap-2">
+          <Button variant="outline" size="sm" onClick={() => openEditQuote(quote)}>
+            Edit
+          </Button>
+          <Button variant="outline" size="sm" onClick={() => handleDeleteQuote(quote)}>
+            Delete
+          </Button>
+        </div>
+      ),
+    },
+  ];
+
   const categoryColumns: Column<QuoteWorkCategory>[] = [
     {
       key: 'name',
@@ -541,6 +885,10 @@ export function QuoteLibraryPage() {
         description="Manage categories and master work items for the quotation module."
         icon={Archive}
       >
+        <Button onClick={openCreateQuote}>
+          <Plus className="mr-2 h-4 w-4" />
+          New Quote
+        </Button>
         <Button variant="outline" onClick={openCreateCategory}>
           <Tags className="mr-2 h-4 w-4" />
           New Category
@@ -555,7 +903,7 @@ export function QuoteLibraryPage() {
         </Button>
       </PageHeader>
 
-      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-4">
+      <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 xl:grid-cols-5">
         {overviewCards.map((card) => (
           <Card key={card.label} className="border-gray-100 shadow-sm">
             <CardContent className="p-5">
@@ -576,7 +924,9 @@ export function QuoteLibraryPage() {
 
       <Tabs
         tabs={[
+          { id: 'builder', label: 'Quote Builder' },
           { id: 'overview', label: 'Selector Guide' },
+          { id: 'quotes', label: 'Quotes', count: quoteList?.total ?? quotes.length },
           { id: 'categories', label: 'Categories', count: categories.length },
           { id: 'measurements', label: 'Measurements', count: measurementTypes.length },
           { id: 'items', label: 'Work Items', count: items.length },
@@ -584,6 +934,245 @@ export function QuoteLibraryPage() {
         activeTab={activeTab}
         onTabChange={(tabId) => setActiveTab(tabId as TabId)}
       />
+
+      {activeTab === 'builder' && (
+        <div className="mx-auto max-w-5xl space-y-6">
+          <Card className="border-gray-100 shadow-sm">
+            <CardContent className="p-6">
+              <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
+                <div>
+                  <h2 className="text-2xl font-black text-gray-900">Construction Quote Builder</h2>
+                  <p className="mt-1 text-sm font-medium text-gray-500">Create the full client quote from the dashboard.</p>
+                </div>
+                <div className="flex items-center gap-3">
+                  {[1, 2, 3].map((stepNumber) => (
+                    <button
+                      key={stepNumber}
+                      type="button"
+                      onClick={() => setBuilderStep(stepNumber as BuilderStep)}
+                      className={cn(
+                        'grid h-11 w-11 place-items-center rounded-full text-sm font-black',
+                        builderStep >= stepNumber ? 'bg-[#1D4F6D] text-white' : 'bg-gray-100 text-gray-400',
+                      )}
+                    >
+                      {stepNumber}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </CardContent>
+          </Card>
+
+          {builderStep === 1 && (
+            <div className="grid gap-6 lg:grid-cols-2">
+              <Card className="border-gray-100 shadow-sm">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Building2 className="h-5 w-5 text-[#1D4F6D]" />
+                    Client Information
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <Input value={builderInfo.clientName} onChange={(e) => setBuilderField('clientName', e.target.value)} placeholder="Client Name *" />
+                  <Input value={builderInfo.projectAddress} onChange={(e) => setBuilderField('projectAddress', e.target.value)} placeholder="Project Address *" />
+                  <Input value={builderInfo.phoneNumber} onChange={(e) => setBuilderField('phoneNumber', e.target.value)} placeholder="Phone Number" />
+                  <Input value={builderInfo.email} onChange={(e) => setBuilderField('email', e.target.value)} placeholder="Email" />
+                  <Input value={builderInfo.estimatedTime} onChange={(e) => setBuilderField('estimatedTime', e.target.value)} placeholder="Time Hours / Estimated Timeline" />
+                </CardContent>
+              </Card>
+
+              <Card className="border-gray-100 shadow-sm">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <Home className="h-5 w-5 text-[#1D4F6D]" />
+                    Project Details
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <Select
+                    value={builderInfo.projectType}
+                    onChange={(e) => setBuilderField('projectType', e.target.value)}
+                    placeholder="Project type"
+                    options={toSelectOptions(selectorOptions.projectTypes)}
+                  />
+                  <Select
+                    value={builderInfo.propertyType}
+                    onChange={(e) => setBuilderField('propertyType', e.target.value)}
+                    placeholder="Property type"
+                    options={toSelectOptions(selectorOptions.propertyTypes)}
+                  />
+                  <Select
+                    value={builderInfo.unitType}
+                    onChange={(e) => setBuilderField('unitType', e.target.value)}
+                    placeholder="Unit type"
+                    options={toSelectOptions(selectorOptions.unitTypes)}
+                  />
+                  <Button
+                    className="w-full"
+                    onClick={() => setBuilderStep(2)}
+                    disabled={!builderInfo.clientName.trim() || !builderInfo.projectAddress.trim()}
+                  >
+                    Next
+                  </Button>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {builderStep === 2 && (
+            <div className="space-y-6">
+              <Card className="border-gray-100 shadow-sm">
+                <CardHeader className="gap-4">
+                  <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+                    <div>
+                      <CardTitle className="flex items-center gap-2">
+                        <Wrench className="h-5 w-5 text-[#1D4F6D]" />
+                        Select Services
+                      </CardTitle>
+                      <CardDescription>Add library services or custom quote items.</CardDescription>
+                    </div>
+                    <Button onClick={openBuilderItemModal}>
+                      <Plus className="mr-2 h-4 w-4" />
+                      Add Custom Item
+                    </Button>
+                  </div>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  {builderItems.length === 0 ? (
+                    <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-8 text-center text-sm font-medium text-gray-500">
+                      No quote items added yet.
+                    </div>
+                  ) : (
+                    <div className="space-y-3">
+                      {builderItems.map((item) => {
+                        const itemSubtotal = Number(item.quantity || 0) * Number(item.unitPrice || 0);
+                        return (
+                          <div key={item.id} className="rounded-2xl border border-gray-100 bg-white p-4 shadow-sm">
+                            <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
+                              <div>
+                                <p className="text-xs font-black uppercase tracking-widest text-gray-400">{item.categoryName}</p>
+                                <h3 className="mt-1 text-lg font-black text-gray-900">{item.title}</h3>
+                                <p className="mt-1 text-sm font-medium text-gray-500">
+                                  {item.quantity} {item.unit} x {formatMoney(Number(item.unitPrice || 0))}
+                                </p>
+                              </div>
+                              <div className="flex items-center gap-3">
+                                <span className="text-lg font-black text-gray-900">{formatMoney(itemSubtotal)}</span>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
+                                  onClick={() => setBuilderItems((current) => current.filter((currentItem) => currentItem.id !== item.id))}
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              </div>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  )}
+
+                  <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4">
+                    <div className="grid gap-4 text-center sm:grid-cols-3">
+                      <div>
+                        <p className="text-xs font-black uppercase tracking-widest text-gray-400">Items Selected</p>
+                        <p className="mt-1 text-2xl font-black text-[#1D4F6D]">{builderItems.length}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-black uppercase tracking-widest text-gray-400">Estimated Total</p>
+                        <p className="mt-1 text-2xl font-black text-[#1D4F6D]">{formatMoney(builderSubtotal)}</p>
+                      </div>
+                      <div>
+                        <p className="text-xs font-black uppercase tracking-widest text-gray-400">Subtotal</p>
+                        <p className="mt-1 text-2xl font-black text-[#1D4F6D]">{formatMoney(builderSubtotal)}</p>
+                      </div>
+                    </div>
+                  </div>
+
+                  <div className="flex flex-col gap-3 sm:flex-row">
+                    <Button variant="outline" className="flex-1" onClick={() => setBuilderStep(1)}>Back</Button>
+                    <Button className="flex-1" onClick={() => setBuilderStep(3)} disabled={builderItems.length === 0}>Next</Button>
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {builderStep === 3 && (
+            <div className="space-y-6">
+              <Card className="border-gray-100 shadow-sm">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <FileText className="h-5 w-5 text-[#1D4F6D]" />
+                    Quote Summary
+                  </CardTitle>
+                </CardHeader>
+                <CardContent className="grid gap-4 md:grid-cols-2">
+                  <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4">
+                    <p className="text-xs font-black uppercase tracking-widest text-gray-400">Client</p>
+                    <p className="mt-1 font-black text-gray-900">{builderInfo.clientName || 'N/A'}</p>
+                  </div>
+                  <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4">
+                    <p className="text-xs font-black uppercase tracking-widest text-gray-400">Project Address</p>
+                    <p className="mt-1 font-black text-gray-900">{builderInfo.projectAddress || 'N/A'}</p>
+                  </div>
+                  <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4">
+                    <p className="text-xs font-black uppercase tracking-widest text-gray-400">Client Email</p>
+                    <p className="mt-1 font-black text-gray-900">{builderInfo.email || 'N/A'}</p>
+                  </div>
+                  <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4">
+                    <p className="text-xs font-black uppercase tracking-widest text-gray-400">Project Details</p>
+                    <p className="mt-1 font-black text-gray-900">
+                      {normalizeText(builderInfo.projectType)} • {normalizeText(builderInfo.propertyType)} • {normalizeText(builderInfo.unitType)}
+                    </p>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-gray-100 shadow-sm">
+                <CardHeader>
+                  <CardTitle>Selected Work Items</CardTitle>
+                </CardHeader>
+                <CardContent className="space-y-3">
+                  {builderItems.map((item) => (
+                    <div key={item.id} className="flex items-center justify-between rounded-2xl border border-gray-100 p-4">
+                      <div>
+                        <p className="font-black text-gray-900">{item.title}</p>
+                        <p className="text-sm font-medium text-gray-500">{item.quantity} {item.unit} x {formatMoney(Number(item.unitPrice || 0))}</p>
+                      </div>
+                      <p className="font-black text-gray-900">{formatMoney(Number(item.quantity || 0) * Number(item.unitPrice || 0))}</p>
+                    </div>
+                  ))}
+                  <div className="flex items-center justify-between border-t border-gray-100 pt-4 text-lg font-black">
+                    <span>Work Items Subtotal</span>
+                    <span>{formatMoney(builderSubtotal)}</span>
+                  </div>
+                </CardContent>
+              </Card>
+
+              <Card className="border-gray-100 shadow-sm">
+                <CardHeader>
+                  <CardTitle>Quote Details</CardTitle>
+                </CardHeader>
+                <CardContent className="grid gap-4 md:grid-cols-2">
+                  <div className="flex items-center gap-3"><CalendarDays className="h-5 w-5 text-[#1D4F6D]" /><span>Valid Until: <b>{quoteValidUntil}</b></span></div>
+                  <div className="flex items-center gap-3"><Mail className="h-5 w-5 text-[#1D4F6D]" /><span>Email: <b>{builderInfo.email || 'N/A'}</b></span></div>
+                  <div className="flex items-center gap-3"><FileText className="h-5 w-5 text-[#1D4F6D]" /><span>Total Work Items: <b>{builderItems.length}</b></span></div>
+                  <div className="flex items-center gap-3"><DollarSign className="h-5 w-5 text-[#1D4F6D]" /><span>Final Total: <b>{formatMoney(builderSubtotal)}</b></span></div>
+                </CardContent>
+              </Card>
+
+              <div className="flex flex-col gap-3 sm:flex-row">
+                <Button variant="outline" className="flex-1" onClick={() => setBuilderStep(2)}>Back</Button>
+                <Button className="flex-1" onClick={handleGenerateBuilderQuote} disabled={builderItems.length === 0 || isCreatingQuote}>
+                  Generate Quote and Save
+                </Button>
+              </div>
+            </div>
+          )}
+        </div>
+      )}
 
       {activeTab === 'overview' && (
         <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
@@ -659,6 +1248,68 @@ export function QuoteLibraryPage() {
             </CardContent>
           </Card>
         </div>
+      )}
+
+      {activeTab === 'quotes' && (
+        <Card className="border-gray-100 shadow-sm">
+          <CardHeader className="gap-4">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
+              <div>
+                <CardTitle className="flex items-center gap-2">
+                  <Archive className="h-5 w-5 text-[#1D4F6D]" />
+                  Quotes
+                </CardTitle>
+                <CardDescription>Create and manage saved quote records from library or custom pricing.</CardDescription>
+              </div>
+              <div className="grid gap-3 lg:grid-cols-4">
+                <Select
+                  value={projectTypeFilter}
+                  onChange={(e) => setProjectTypeFilter(e.target.value)}
+                  placeholder="Project type"
+                  options={[
+                    { value: '', label: 'All Project Types' },
+                    ...toSelectOptions(selectorOptions.projectTypes),
+                  ]}
+                />
+                <Select
+                  value={propertyTypeFilter}
+                  onChange={(e) => setPropertyTypeFilter(e.target.value)}
+                  placeholder="Property type"
+                  options={[
+                    { value: '', label: 'All Property Types' },
+                    ...toSelectOptions(selectorOptions.propertyTypes),
+                  ]}
+                />
+                <Select
+                  value={unitTypeFilter}
+                  onChange={(e) => setUnitTypeFilter(e.target.value)}
+                  placeholder="Unit type"
+                  options={[
+                    { value: '', label: 'All Unit Types' },
+                    ...toSelectOptions(selectorOptions.unitTypes),
+                  ]}
+                />
+                <Button onClick={openCreateQuote}>
+                  <Plus className="mr-2 h-4 w-4" />
+                  New Quote
+                </Button>
+              </div>
+            </div>
+          </CardHeader>
+          <CardContent className="space-y-4">
+            {quotesLoading ? (
+              <div className="flex min-h-[240px] items-center justify-center">
+                <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#1D4F6D] border-t-transparent" />
+              </div>
+            ) : (
+              <Table
+                data={quotes}
+                columns={quoteColumns}
+                className="shadow-none border-0"
+              />
+            )}
+          </CardContent>
+        </Card>
       )}
 
       {activeTab === 'categories' && (
@@ -828,6 +1479,191 @@ export function QuoteLibraryPage() {
           </CardContent>
         </Card>
       )}
+
+      <QuoteFormModal
+        open={builderItemModalOpen}
+        onClose={() => setBuilderItemModalOpen(false)}
+        title="Add Quote Item"
+      >
+        <form className="space-y-5" onSubmit={(event) => { event.preventDefault(); handleAddBuilderItem(); }}>
+          <div className="space-y-2">
+            <label className="text-xs font-black uppercase tracking-widest text-gray-400">Library Service</label>
+            <Select
+              value={builderItemDraft.workItemId}
+              onChange={(e) => applyBuilderWorkItem(e.target.value)}
+              placeholder="Select service or create custom"
+              options={[
+                { value: '', label: 'Custom Item' },
+                ...items.map((item) => ({
+                  value: item.id,
+                  label: `${item.name} - ${formatMoney(item.unitCost ?? null)}`,
+                })),
+              ]}
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-xs font-black uppercase tracking-widest text-gray-400">Service Name</label>
+            <Input
+              value={builderItemDraft.title}
+              onChange={(e) => setBuilderItemDraft((draft) => ({ ...draft, title: e.target.value }))}
+              placeholder="Service"
+              autoFocus
+            />
+          </div>
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="space-y-2">
+              <label className="text-xs font-black uppercase tracking-widest text-gray-400">Quantity</label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                value={builderItemDraft.quantity}
+                onChange={(e) => setBuilderItemDraft((draft) => ({ ...draft, quantity: e.target.value }))}
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-black uppercase tracking-widest text-gray-400">Unit</label>
+              <Input
+                value={builderItemDraft.unit}
+                onChange={(e) => setBuilderItemDraft((draft) => ({ ...draft, unit: e.target.value }))}
+                placeholder="kg / room / sqft"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-black uppercase tracking-widest text-gray-400">Unit Price</label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                value={builderItemDraft.unitPrice}
+                onChange={(e) => setBuilderItemDraft((draft) => ({ ...draft, unitPrice: e.target.value }))}
+                placeholder="0.00"
+              />
+            </div>
+          </div>
+          <div className="rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3">
+            <p className="text-xs font-black uppercase tracking-widest text-gray-400">Subtotal</p>
+            <p className="mt-1 text-xl font-black text-gray-900">
+              {formatMoney(Number(builderItemDraft.quantity || 0) * Number(builderItemDraft.unitPrice || 0))}
+            </p>
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" type="button" onClick={() => setBuilderItemModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={!builderItemDraft.title.trim()}>
+              Add Item
+            </Button>
+          </div>
+        </form>
+      </QuoteFormModal>
+
+      <QuoteFormModal
+        open={quoteModalOpen}
+        onClose={() => setQuoteModalOpen(false)}
+        title={editingQuote ? 'Edit Quote' : 'New Quote'}
+      >
+        <form className="space-y-5" onSubmit={handleQuoteSubmit}>
+          <div className="space-y-2">
+            <label className="text-xs font-black uppercase tracking-widest text-gray-400">Use Library Item</label>
+            <Select
+              value={quoteDraft.workItemId}
+              onChange={(e) => applyQuoteWorkItem(e.target.value)}
+              placeholder="Custom quote or select work item"
+              options={[
+                { value: '', label: 'Custom Quote' },
+                ...items.map((item) => ({
+                  value: item.id,
+                  label: `${item.name} - ${formatMoney(item.unitCost ?? null)}`,
+                })),
+              ]}
+            />
+          </div>
+          <div className="grid gap-4 md:grid-cols-3">
+            <Select
+              value={quoteDraft.projectType}
+              onChange={(e) => setQuoteDraft((draft) => ({ ...draft, projectType: e.target.value }))}
+              placeholder="Project type"
+              options={toSelectOptions(selectorOptions.projectTypes)}
+            />
+            <Select
+              value={quoteDraft.propertyType}
+              onChange={(e) => setQuoteDraft((draft) => ({ ...draft, propertyType: e.target.value }))}
+              placeholder="Property type"
+              options={toSelectOptions(selectorOptions.propertyTypes)}
+            />
+            <Select
+              value={quoteDraft.unitType}
+              onChange={(e) => setQuoteDraft((draft) => ({ ...draft, unitType: e.target.value }))}
+              placeholder="Unit type"
+              options={toSelectOptions(selectorOptions.unitTypes)}
+            />
+          </div>
+          <div className="space-y-2">
+            <label className="text-xs font-black uppercase tracking-widest text-gray-400">Quote Title</label>
+            <Input
+              value={quoteDraft.title}
+              onChange={(e) => setQuoteDraft((draft) => ({ ...draft, title: e.target.value }))}
+              placeholder="Interior Painting"
+              autoFocus
+            />
+          </div>
+          <div className="grid gap-4 md:grid-cols-3">
+            <div className="space-y-2">
+              <label className="text-xs font-black uppercase tracking-widest text-gray-400">Quantity</label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                value={quoteDraft.quantity}
+                onChange={(e) => setQuoteDraft((draft) => ({ ...draft, quantity: e.target.value }))}
+                placeholder="1"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-black uppercase tracking-widest text-gray-400">Unit</label>
+              <Input
+                value={quoteDraft.unit}
+                onChange={(e) => setQuoteDraft((draft) => ({ ...draft, unit: e.target.value }))}
+                placeholder="room"
+              />
+            </div>
+            <div className="space-y-2">
+              <label className="text-xs font-black uppercase tracking-widest text-gray-400">Unit Price</label>
+              <Input
+                type="number"
+                step="0.01"
+                min="0"
+                value={quoteDraft.unitPrice}
+                onChange={(e) => setQuoteDraft((draft) => ({ ...draft, unitPrice: e.target.value }))}
+                placeholder="0.00"
+              />
+            </div>
+          </div>
+          <div className="rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3">
+            <p className="text-xs font-black uppercase tracking-widest text-gray-400">Subtotal</p>
+            <p className="mt-1 text-xl font-black text-gray-900">
+              {formatMoney(Number(quoteDraft.quantity || 0) * Number(quoteDraft.unitPrice || 0))}
+            </p>
+          </div>
+          <div className="space-y-2">
+            <label className="text-xs font-black uppercase tracking-widest text-gray-400">Notes</label>
+            <Textarea
+              value={quoteDraft.notes}
+              onChange={(e) => setQuoteDraft((draft) => ({ ...draft, notes: e.target.value }))}
+              placeholder="Optional quote notes"
+            />
+          </div>
+          <div className="flex justify-end gap-3">
+            <Button variant="outline" type="button" onClick={() => setQuoteModalOpen(false)}>
+              Cancel
+            </Button>
+            <Button type="submit" disabled={isCreatingQuote || isUpdatingQuote}>
+              {editingQuote ? 'Save Changes' : 'Create Quote'}
+            </Button>
+          </div>
+        </form>
+      </QuoteFormModal>
 
       <QuoteFormModal
         open={categoryModalOpen}

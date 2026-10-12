@@ -270,7 +270,7 @@ export function TaskDetailPage() {
                     </div>
                 </div>
 
-                <div className="grid grid-cols-2 md:grid-cols-5 gap-4 py-4 border-y border-gray-100">
+                <div className={`grid grid-cols-2 ${canManageTaskPrice ? 'md:grid-cols-6' : 'md:grid-cols-5'} gap-4 py-4 border-y border-gray-100`}>
                     <div>
                         <div className="text-xs text-gray-400 mb-1 flex items-center gap-1"><User className="w-3 h-3" /> Assigned To</div>
                         <div className="font-medium text-sm text-gray-800">
@@ -289,6 +289,12 @@ export function TaskDetailPage() {
                         <div className="text-xs text-gray-400 mb-1 flex items-center gap-1"><MapPin className="w-3 h-3" /> Priority</div>
                         <div className="font-medium text-sm text-gray-800 capitalize">{data.priority?.toLowerCase() || 'Normal'}</div>
                     </div>
+                    {canManageTaskPrice && (
+                        <div>
+                            <div className="text-xs text-gray-400 mb-1 flex items-center gap-1"><DollarSign className="w-3 h-3 text-emerald-600" /> Internal Price</div>
+                            <div className="font-bold text-sm text-emerald-700">${Number(data.price ?? data.task?.price ?? 0).toFixed(2)}</div>
+                        </div>
+                    )}
                     <div>
                         <div className="text-xs text-gray-400 mb-1 flex items-center gap-1"><MapPin className="w-3 h-3" /> Location</div>
                         <div className="flex flex-wrap gap-1">

@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
-import { Plus, CheckSquare, Clock, MoreVertical, Edit, Edit2, UserPlus, Trash2, ChevronDown, ChevronUp, ExternalLink } from 'lucide-react';
+import { Plus, CheckSquare, Clock, MoreVertical, Edit, Edit2, UserPlus, Trash2, ChevronDown, ChevronUp, ExternalLink, DollarSign } from 'lucide-react';
 import { useAppSelector } from '@/store/hooks';
 import { selectAuthUser } from '@/store/authSlice';
 import { buildRoute } from '@/config/routes';
@@ -452,6 +452,7 @@ export function ProjectTasks() {
                             key={task.id}
                             task={task}
                             isSuperAdmin={isSuperAdmin}
+                            canManageTaskPrice={canManageTaskPrice}
                             onEdit={openEditModal}
                             onAssign={openAssignModal}
                             onDelete={(t) => { setDeleteTaskId(t.id); setIsDeleteModalOpen(true); }}
@@ -607,7 +608,7 @@ export function ProjectTasks() {
     );
 }
 
-function ProjectTaskCard({ task, isSuperAdmin, onEdit, onAssign, onDelete, onAddSubtask }: { task: any, isSuperAdmin: boolean, onEdit: (t: any) => void, onAssign: (t: any) => void, onDelete: (t: any) => void, onAddSubtask: (t: any) => void }) {
+function ProjectTaskCard({ task, isSuperAdmin, canManageTaskPrice, onEdit, onAssign, onDelete, onAddSubtask }: { task: any, isSuperAdmin: boolean, canManageTaskPrice?: boolean, onEdit: (t: any) => void, onAssign: (t: any) => void, onDelete: (t: any) => void, onAddSubtask: (t: any) => void }) {
     const navigate = useNavigate();
     const { data: subtasksRaw, isLoading } = useSubTasks(task.id);
     const subtasks = (subtasksRaw as any)?.data || (Array.isArray(subtasksRaw) ? subtasksRaw : []);
@@ -643,7 +644,7 @@ function ProjectTaskCard({ task, isSuperAdmin, onEdit, onAssign, onDelete, onAdd
                     </div>
                     <p className="text-xs text-gray-500 mb-4 line-clamp-2 min-h-[32px]">{task.description || 'No description provided.'}</p>
                     
-                    <div className="grid grid-cols-2 gap-3 mb-4">
+                    <div className={`grid ${canManageTaskPrice ? 'grid-cols-3' : 'grid-cols-2'} gap-2.5 mb-4`}>
                         <div className="bg-gray-50 p-2 rounded-lg border border-gray-100">
                             <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">
                                 <Clock className="h-3 w-3" />
@@ -654,10 +655,19 @@ function ProjectTaskCard({ task, isSuperAdmin, onEdit, onAssign, onDelete, onAdd
                         <div className="bg-blue-50 p-2 rounded-lg border border-blue-100">
                             <div className="flex items-center gap-1.5 text-[10px] font-bold text-blue-400 uppercase tracking-wider mb-1">
                                 <CheckSquare className="h-3 w-3" />
-                                Assignments
+                                Workers
                             </div>
-                            <div className="text-sm font-bold text-blue-900">{task.assignedWorkerCount || task.assignees?.length || 0} Workers</div>
+                            <div className="text-sm font-bold text-blue-900">{task.assignedWorkerCount || task.assignees?.length || 0}</div>
                         </div>
+                        {canManageTaskPrice && (
+                            <div className="bg-emerald-50 p-2 rounded-lg border border-emerald-100">
+                                <div className="flex items-center gap-1.5 text-[10px] font-bold text-emerald-600 uppercase tracking-wider mb-1">
+                                    <DollarSign className="h-3 w-3" />
+                                    Price
+                                </div>
+                                <div className="text-sm font-bold text-emerald-800">${Number(task.price || 0).toFixed(2)}</div>
+                            </div>
+                        )}
                     </div>
                     
                     {/* Show Locations */}
@@ -718,8 +728,15 @@ function ProjectTaskCard({ task, isSuperAdmin, onEdit, onAssign, onDelete, onAdd
                                             })}
                                         </div>
                                     )}
-                                    <div className="text-[10px] font-bold text-gray-400 bg-gray-50 px-2 py-1 rounded w-fit">
-                                        {st.estimatedHours || (st.task && st.task.estimatedHours) || 0} hrs
+                                    <div className="flex items-center gap-1.5">
+                                        {canManageTaskPrice && (
+                                            <div className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded">
+                                                ${Number(st.price || 0).toFixed(2)}
+                                            </div>
+                                        )}
+                                        <div className="text-[10px] font-bold text-gray-400 bg-gray-50 px-2 py-1 rounded w-fit">
+                                            {st.estimatedHours || (st.task && st.task.estimatedHours) || 0} hrs
+                                        </div>
                                     </div>
                                 </div>
                             </div>
