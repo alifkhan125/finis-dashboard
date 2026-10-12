@@ -36,7 +36,7 @@ function getEnvVar(key: string, defaultValue?: string): string {
     return value || defaultValue || '';
 }
 
-function getBoolEnvVar(key: string, defaultValue: boolean = false): boolean {
+function getBoolEnvVar(key: string, defaultValue = false): boolean {
     const value = (import.meta.env as Record<string, string | undefined>)[key];
     if (value === undefined) return defaultValue;
     return value === 'true' || value === '1';

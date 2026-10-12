@@ -92,7 +92,7 @@ export function CreateProjectModal({
     }
 
     // Generate structure based on type (Create Mode)
-    let floors: any[] = [];
+    const floors: any[] = [];
     const projectId = `proj-${Date.now()}`;
 
     if (formData.type === 'apartment_building') {

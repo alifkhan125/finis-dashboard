@@ -182,7 +182,7 @@ class ApiClient {
         endpoint: string,
         file: File,
         additionalData?: Record<string, unknown>,
-        fileFieldName: string = 'file'
+        fileFieldName = 'file'
     ): Promise<ApiResponse<T>> {
         const formData = new FormData();
         formData.append(fileFieldName, file);

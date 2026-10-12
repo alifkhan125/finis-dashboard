@@ -135,7 +135,7 @@ export interface CreateQuoteWorkCategoryPayload {
   isActive?: boolean;
 }
 
-export interface UpdateQuoteWorkCategoryPayload extends Partial<CreateQuoteWorkCategoryPayload> {}
+export type UpdateQuoteWorkCategoryPayload = Partial<CreateQuoteWorkCategoryPayload>
 
 export interface CreateQuoteWorkItemPayload {
   categoryId: string;
@@ -149,7 +149,7 @@ export interface CreateQuoteWorkItemPayload {
   isActive?: boolean;
 }
 
-export interface UpdateQuoteWorkItemPayload extends Partial<CreateQuoteWorkItemPayload> {}
+export type UpdateQuoteWorkItemPayload = Partial<CreateQuoteWorkItemPayload>
 
 export interface QuoteLibraryFilters {
   search?: string;
@@ -182,7 +182,7 @@ export interface CreateQuoteMeasurementTypePayload {
   isActive?: boolean;
 }
 
-export interface UpdateQuoteMeasurementTypePayload extends Partial<CreateQuoteMeasurementTypePayload> {}
+export type UpdateQuoteMeasurementTypePayload = Partial<CreateQuoteMeasurementTypePayload>
 
 const baseQuery = fetchBaseQuery({
   baseUrl: config.apiBaseUrl,

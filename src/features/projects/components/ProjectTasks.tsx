@@ -127,7 +127,7 @@ export function ProjectTasks() {
         setIsAssignModalOpen(true);
     };
 
-    const handleAssignConfirm = async (isUnassign: boolean = false) => {
+    const handleAssignConfirm = async (isUnassign = false) => {
         if (!selectedTaskForAssignment || (!selectedWorkerId && !isUnassign)) return;
         try {
             const payload = isUnassign ? { workerIds: [] } : { workerId: selectedWorkerId };

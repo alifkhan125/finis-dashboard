@@ -96,7 +96,7 @@ export function ProjectsPage() {
       } else {
         const effectiveStart = hasValidStart ? pStart! : hasValidEnd ? pEnd! : null;
         const effectiveEnd = hasValidEnd ? pEnd! : effectiveStart;
-        matchesTime = !!effectiveStart && effectiveStart <= filterEnd && (!!effectiveEnd ? effectiveEnd >= filterStart : true);
+        matchesTime = !!effectiveStart && effectiveStart <= filterEnd && (effectiveEnd ? effectiveEnd >= filterStart : true);
       }
     }
 

@@ -91,10 +91,6 @@ export function SubscriptionPlansPage() {
     }
   }, [token, isSuperAdmin]);
 
-  if (!isSuperAdmin) {
-    return <PublicSubscriptionPlansPage isDashboardView={true} />;
-  }
-
   const stats = useMemo(() => {
     const active = plans.filter((p) => p.isActive).length;
     const average = plans.length
@@ -118,6 +114,10 @@ export function SubscriptionPlansPage() {
       })),
     [plans],
   );
+
+  if (!isSuperAdmin) {
+    return <PublicSubscriptionPlansPage isDashboardView={true} />;
+  }
 
   const openCreate = () => {
     setEditingPlan(null);
