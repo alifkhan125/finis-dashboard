@@ -20,6 +20,7 @@ export function ProjectTasks() {
     const { id: projectId } = useParams();
     const authUser = useAppSelector(selectAuthUser);
     const isSuperAdmin = authUser?.role === 'super_admin';
+    const canManageTaskPrice = authUser?.role === 'admin' || authUser?.role === 'super_admin';
     const { data: tasks, isLoading } = useTasks(projectId ?? '');
     const { createTask, isCreating } = useCreateTask();
     const { assignTask, isAssigning } = useAssignTask();
@@ -49,6 +50,7 @@ export function ProjectTasks() {
         title: string;
         description: string;
         estimatedHours: number;
+        price: number;
         allowSubTaskCreation: boolean;
         floorIds: string[];
         unitIds: string[];
@@ -56,22 +58,54 @@ export function ProjectTasks() {
         title: '',
         description: '',
         estimatedHours: 0,
+        price: 0,
         allowSubTaskCreation: false,
         floorIds: [],
         unitIds: []
     });
 
-    const [newSubTask, setNewSubTask] = useState<{ title: string; description: string; estimatedHours: number; unitIds: string[] }>({
+    const [newSubTask, setNewSubTask] = useState<{ title: string; description: string; estimatedHours: number; price: number; unitIds: string[] }>({
         title: '',
         description: '',
         estimatedHours: 0,
+        price: 0,
         unitIds: []
     });
 
     const selectedFloors = floors?.filter((f: any) => newTask.floorIds.includes(f.id)) || [];
     const floorUnits = selectedFloors.flatMap((f: any) => f.rooms || f.units || []);
-
     const allUnits = floors?.flatMap((f: any) => f.rooms || f.units || []) || [];
+    const allFloorIds = floors?.map((f: any) => f.id).filter(Boolean) || [];
+    const allFloorUnitIds = floorUnits.map((u: any) => u.id).filter(Boolean);
+    const selectedTaskUnits = selectedTaskForSubTask?.taskUnits?.map((tu: any) => tu.unit).filter(Boolean) || [];
+    const selectedTaskUnitIds = selectedTaskUnits.map((u: any) => u.id).filter(Boolean);
+    const areAllFloorsSelected = allFloorIds.length > 0 && newTask.floorIds.length === allFloorIds.length;
+    const areAllTaskUnitsSelected = allFloorUnitIds.length > 0 && allFloorUnitIds.every((id: string) => newTask.unitIds.includes(id));
+    const areAllSubTaskUnitsSelected = selectedTaskUnitIds.length > 0 && selectedTaskUnitIds.every((id: string) => newSubTask.unitIds.includes(id));
+
+    const toggleAllFloors = () => {
+        setNewTask(prev => {
+            if (areAllFloorsSelected) {
+                return { ...prev, floorIds: [], unitIds: [] };
+            }
+
+            return { ...prev, floorIds: allFloorIds, unitIds: [] };
+        });
+    };
+
+    const toggleAllTaskUnits = () => {
+        setNewTask(prev => ({
+            ...prev,
+            unitIds: areAllTaskUnitsSelected ? [] : allFloorUnitIds
+        }));
+    };
+
+    const toggleAllSubTaskUnits = () => {
+        setNewSubTask(prev => ({
+            ...prev,
+            unitIds: areAllSubTaskUnitsSelected ? [] : selectedTaskUnitIds
+        }));
+    };
 
     const handleSaveTaskDef = async () => {
         if (!newTask.title || !projectId) return;
@@ -82,6 +116,7 @@ export function ProjectTasks() {
                 description: newTask.description,
                 estimatedHours: newTask.estimatedHours,
                 allowSubTaskCreation: newTask.allowSubTaskCreation,
+                ...(canManageTaskPrice ? { price: newTask.price || 0 } : {}),
                 ...(newTask.floorIds.length ? { floorIds: newTask.floorIds } : {}),
                 ...(newTask.unitIds.length ? { unitIds: newTask.unitIds } : {})
             };
@@ -92,7 +127,7 @@ export function ProjectTasks() {
             }
             setIsAddModalOpen(false);
             setEditTaskId(null);
-            setNewTask({ title: '', description: '', estimatedHours: 0, allowSubTaskCreation: false, floorIds: [], unitIds: [] });
+            setNewTask({ title: '', description: '', estimatedHours: 0, price: 0, allowSubTaskCreation: false, floorIds: [], unitIds: [] });
         } catch (err) {
             console.error('Error saving task', err);
         }
@@ -103,6 +138,7 @@ export function ProjectTasks() {
             title: task.title,
             description: task.description || '',
             estimatedHours: task.estimatedHours || 0,
+            price: task.price || 0,
             allowSubTaskCreation: task.allowSubTaskCreation ?? false,
             floorIds: task.taskFloors?.map((tf: any) => tf.floor?.id).filter(Boolean) || [],
             unitIds: task.taskUnits?.map((tu: any) => tu.unit?.id).filter(Boolean) || []
@@ -147,10 +183,11 @@ export function ProjectTasks() {
                 title: newSubTask.title,
                 description: newSubTask.description,
                 estimatedHours: newSubTask.estimatedHours,
+                ...(canManageTaskPrice ? { price: newSubTask.price || 0 } : {}),
                 unitIds: newSubTask.unitIds
             });
             setIsSubTaskModalOpen(false);
-            setNewSubTask({ title: '', description: '', estimatedHours: 0, unitIds: [] });
+            setNewSubTask({ title: '', description: '', estimatedHours: 0, price: 0, unitIds: [] });
             setSelectedTaskForSubTask(null);
         } catch (err) {
             console.error('Error creating subtask', err);
@@ -180,7 +217,7 @@ export function ProjectTasks() {
                 onClose={() => {
                     setIsAddModalOpen(false);
                     setEditTaskId(null);
-                    setNewTask({ title: '', description: '', estimatedHours: 0, allowSubTaskCreation: false, floorIds: [], unitIds: [] });
+                    setNewTask({ title: '', description: '', estimatedHours: 0, price: 0, allowSubTaskCreation: false, floorIds: [], unitIds: [] });
                 }}
                 title={editTaskId ? "Edit Task" : "Create Task"}
                 maxWidth="md"
@@ -214,6 +251,19 @@ export function ProjectTasks() {
                                     placeholder="e.g. 4"
                                 />
                             </div>
+                            {canManageTaskPrice && (
+                                <div className="space-y-2">
+                                    <Label>Internal Price</Label>
+                                    <Input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        value={newTask.price || ''}
+                                        onChange={(e) => setNewTask({ ...newTask, price: Number(e.target.value) || 0 })}
+                                        placeholder="e.g. 150"
+                                    />
+                                </div>
+                            )}
                             <div className="flex items-center space-x-2 pt-8">
                                 <Switch
                                     checked={newTask.allowSubTaskCreation}
@@ -224,7 +274,18 @@ export function ProjectTasks() {
                         </div>
                         <div className="space-y-4 pt-2">
                             <div className="space-y-2">
-                                <Label>Floors / Sections (Optional)</Label>
+                                <div className="flex items-center justify-between gap-3">
+                                    <Label>Floors / Sections (Optional)</Label>
+                                    {allFloorIds.length > 0 && (
+                                        <button
+                                            type="button"
+                                            onClick={toggleAllFloors}
+                                            className="text-xs font-bold text-blue-700 hover:text-blue-800"
+                                        >
+                                            {areAllFloorsSelected ? 'Deselect All' : 'Select All'}
+                                        </button>
+                                    )}
+                                </div>
                                 <div className="flex flex-wrap gap-2">
                                     {floors?.map((f: any) => {
                                         const isSelected = newTask.floorIds.includes(f.id);
@@ -267,7 +328,16 @@ export function ProjectTasks() {
                             
                             {newTask.floorIds.length > 0 && floorUnits.length > 0 && (
                                 <div className="space-y-2">
-                                    <Label>Units / Rooms (Optional)</Label>
+                                    <div className="flex items-center justify-between gap-3">
+                                        <Label>Units / Rooms (Optional)</Label>
+                                        <button
+                                            type="button"
+                                            onClick={toggleAllTaskUnits}
+                                            className="text-xs font-bold text-blue-700 hover:text-blue-800"
+                                        >
+                                            {areAllTaskUnitsSelected ? 'Deselect All' : 'Select All'}
+                                        </button>
+                                    </div>
                                     <div className="flex flex-wrap gap-2">
                                         {floorUnits.map((u: any) => {
                                             const isSelected = newTask.unitIds.includes(u.id);
@@ -388,7 +458,7 @@ export function ProjectTasks() {
                             onAddSubtask={(t) => { 
                                 setSelectedTaskForSubTask(t);
                                 const defaultUnitIds = t.taskUnits?.[0]?.unit?.id ? [t.taskUnits[0].unit.id] : [];
-                                setNewSubTask({ title: '', description: '', estimatedHours: 0, unitIds: defaultUnitIds });
+                                setNewSubTask({ title: '', description: '', estimatedHours: 0, price: 0, unitIds: defaultUnitIds });
                                 setIsSubTaskModalOpen(true); 
                             }}
                         />
@@ -424,7 +494,7 @@ export function ProjectTasks() {
                 onClose={() => {
                     setIsSubTaskModalOpen(false);
                     setSelectedTaskForSubTask(null);
-                    setNewSubTask({ title: '', description: '', estimatedHours: 0, unitIds: [] });
+                    setNewSubTask({ title: '', description: '', estimatedHours: 0, price: 0, unitIds: [] });
                 }}
                 title="Create Subtask"
                 maxWidth="md"
@@ -463,12 +533,33 @@ export function ProjectTasks() {
                                     onChange={(e) => setNewSubTask(prev => ({ ...prev, estimatedHours: parseFloat(e.target.value) || 0 }))}
                                 />
                             </div>
+                            {canManageTaskPrice && (
+                                <div className="space-y-2">
+                                    <Label>Internal Price</Label>
+                                    <Input
+                                        type="number"
+                                        min="0"
+                                        step="0.01"
+                                        value={newSubTask.price || ''}
+                                        onChange={(e) => setNewSubTask(prev => ({ ...prev, price: parseFloat(e.target.value) || 0 }))}
+                                    />
+                                </div>
+                            )}
                             <div className="space-y-2 col-span-2">
-                                <Label>Units *</Label>
+                                <div className="flex items-center justify-between gap-3">
+                                    <Label>Units *</Label>
+                                    {selectedTaskUnitIds.length > 0 && (
+                                        <button
+                                            type="button"
+                                            onClick={toggleAllSubTaskUnits}
+                                            className="text-xs font-bold text-purple-700 hover:text-purple-800"
+                                        >
+                                            {areAllSubTaskUnitsSelected ? 'Deselect All' : 'Select All'}
+                                        </button>
+                                    )}
+                                </div>
                                 <div className="flex flex-wrap gap-2">
-                                    {selectedTaskForSubTask?.taskUnits?.map((tu: any) => {
-                                        const u = tu.unit;
-                                        if (!u) return null;
+                                    {selectedTaskUnits.map((u: any) => {
                                         const isSelected = newSubTask.unitIds.includes(u.id);
                                         return (
                                             <button

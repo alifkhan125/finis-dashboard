@@ -7,6 +7,8 @@ import { ArrowLeft, Clock, MapPin, User, FileText, CheckCircle, XCircle, Trash2,
 import { format } from 'date-fns';
 import { ROUTES } from '@/config/routes';
 import { config } from '@/config/env';
+import { selectAuthUser } from '@/store/authSlice';
+import { useAppSelector } from '@/store/hooks';
 
 function resolveMediaUrl(url?: string | null) {
     if (!url) return null;
@@ -29,6 +31,8 @@ export function TaskDetailPage() {
     const navigate = useNavigate();
 
     const isSubtask = location.pathname.includes('/subtasks/');
+    const authUser = useAppSelector(selectAuthUser);
+    const canManageTaskPrice = authUser?.role === 'admin' || authUser?.role === 'super_admin';
 
     const { data: taskDetails, isLoading: isTaskLoading } = useTaskDetails(!isSubtask ? taskId || null : null);
     const { data: subTaskDetails, isLoading: isSubtaskLoading } = useSubTaskDetails(isSubtask ? taskId || null : null);
@@ -37,6 +41,7 @@ export function TaskDetailPage() {
     const isLoading = isSubtask ? isSubtaskLoading : isTaskLoading;
 
     const [reviewNote, setReviewNote] = useState('');
+    const [approvalPrice, setApprovalPrice] = useState('');
     const [completionNote, setCompletionNote] = useState('');
     const [isDeleteConfirm, setIsDeleteConfirm] = useState(false);
 
@@ -92,11 +97,16 @@ export function TaskDetailPage() {
         if (!taskId) return;
         try {
             if (isSubtask) {
-                await reviewSubTaskApproval(taskId, { reviewDecision: 'approved', reviewDescription: reviewNote || undefined });
+                await reviewSubTaskApproval(taskId, {
+                    reviewDecision: 'approved',
+                    reviewDescription: reviewNote || undefined,
+                    ...(canManageTaskPrice && approvalPrice.trim() ? { price: Number(approvalPrice) } : {}),
+                });
             } else {
                 await reviewTaskApproval(taskId, { reviewDecision: 'approved', reviewDescription: reviewNote || undefined });
             }
             setReviewNote('');
+            setApprovalPrice('');
         } catch (err) { console.error(err); }
     };
 
@@ -109,6 +119,7 @@ export function TaskDetailPage() {
                 await reviewTaskApproval(taskId, { reviewDecision: 'rejected', reviewDescription: reviewNote || undefined });
             }
             setReviewNote('');
+            setApprovalPrice('');
         } catch (err) { console.error(err); }
     };
 
@@ -300,6 +311,21 @@ export function TaskDetailPage() {
                         <p className="text-sm text-amber-600 mt-0.5">Worker cannot start until you approve it.</p>
                     </div>
                     <textarea className="w-full px-4 py-3 border border-gray-200 rounded-lg focus:ring-2 focus:ring-amber-400 text-sm mb-4 resize-none" rows={3} placeholder="Add notes (optional)..." value={reviewNote} onChange={(e) => setReviewNote(e.target.value)} />
+                    {isSubtask && canManageTaskPrice && (
+                        <div className="mb-4">
+                            <label className="mb-1 block text-xs font-bold uppercase tracking-wide text-gray-500">Internal Price</label>
+                            <input
+                                type="number"
+                                min="0"
+                                step="0.01"
+                                className="w-full rounded-lg border border-gray-200 px-4 py-3 text-sm focus:ring-2 focus:ring-amber-400"
+                                placeholder="e.g. 150"
+                                value={approvalPrice}
+                                onChange={(e) => setApprovalPrice(e.target.value)}
+                            />
+                            <p className="mt-1 text-xs text-gray-400">Visible to admin only. Worker/manager responses never expose this value.</p>
+                        </div>
+                    )}
                     <div className="flex gap-3">
                         <Button variant="outline" className="flex-1 border-red-200 text-red-600 hover:bg-red-50 font-semibold" onClick={handleReject} disabled={isReviewing}>
                             <XCircle className="w-4 h-4 mr-2" />{isReviewing ? 'Processing...' : 'Reject'}

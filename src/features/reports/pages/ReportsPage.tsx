@@ -7,6 +7,7 @@ import {
   Download,
   FileText,
   Loader2,
+  Save,
   TrendingUp,
   Receipt,
 } from 'lucide-react';
@@ -90,6 +91,8 @@ interface ProjectInvoicesReportData {
     totalBudget: number;
     totalSpent: number;
     totalRemaining: number;
+    totalBillableSubTasks?: number;
+    totalInvoiceAmount?: number;
     byStatus: {
       planning: number;
       active: number;
@@ -114,6 +117,20 @@ interface ProjectInvoicesReportData {
     spent?: number | null;
     remaining?: number | null;
     approvedExpenses: number;
+    billableSubTaskCount?: number;
+    invoiceTotal?: number;
+    invoiceLines?: Array<{
+      subTaskId: string;
+      taskId: string;
+      taskTitle: string;
+      title: string;
+      quantity: number;
+      unitValue: number;
+      lineTotal: number;
+      completedAt?: string | null;
+      unit?: { id: string; name: string; floor?: { id: string; name: string } | null } | null;
+      worker?: { id: string; fullName: string } | null;
+    }>;
     taskCompletion: number;
     counts: {
       teamMembers: number;
@@ -352,6 +369,8 @@ export function ReportsPage() {
   const [reportData, setReportData] = useState<ReportData | null>(null);
   const [isLoading, setIsLoading] = useState(false);
   const [isExporting, setIsExporting] = useState(false);
+  const [isSavingInvoice, setIsSavingInvoice] = useState(false);
+  const [saveMessage, setSaveMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
 
   const debouncedCompanyId = useDebounce(companyId, 200);
@@ -441,12 +460,14 @@ export function ReportsPage() {
     setProjectId('');
     setReportData(null);
     setError(null);
+    setSaveMessage(null);
   };
 
   const handleProjectChange = (value: string) => {
     setProjectId(value);
     setReportData(null);
     setError(null);
+    setSaveMessage(null);
   };
 
   const loadReport = async () => {
@@ -457,6 +478,7 @@ export function ReportsPage() {
 
     setIsLoading(true);
     setError(null);
+    setSaveMessage(null);
 
     try {
       const response = await apiClient.get<ApiEnvelope<ReportData> | ReportData>(endpointBase, {
@@ -523,6 +545,41 @@ export function ReportsPage() {
     }
   };
 
+  const handleSaveInvoice = async () => {
+    if (reportData?.type !== 'project_invoices') return;
+    if (!startDate || !endDate) {
+      setError('Please select both start and end dates.');
+      return;
+    }
+
+    const targetProjectId = projectId || (reportData.projects.length === 1 ? reportData.projects[0].id : '');
+    if (!targetProjectId) {
+      setError('Please select one project before saving an invoice.');
+      return;
+    }
+
+    setIsSavingInvoice(true);
+    setError(null);
+    setSaveMessage(null);
+
+    try {
+      const response = await apiClient.post<ApiEnvelope<{ invoiceNumber: string }> | { invoiceNumber: string }>(
+        '/admin/invoices',
+        {
+          projectId: targetProjectId,
+          startDate: startDate.toISOString(),
+          endDate: endDate.toISOString(),
+        },
+      );
+      const payload = isEnvelope(response.data) ? response.data.data : response.data;
+      setSaveMessage(`Invoice ${payload.invoiceNumber} saved.`);
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'Failed to save invoice');
+    } finally {
+      setIsSavingInvoice(false);
+    }
+  };
+
   const summaryCards = useMemo(() => {
     if (!reportData) return [];
 
@@ -537,8 +594,8 @@ export function ReportsPage() {
       case 'project_invoices':
         return [
           { label: 'Projects', value: reportData.summary.totalProjects.toString(), tone: 'blue' },
-          { label: 'Budget', value: formatMoney(reportData.summary.totalBudget), tone: 'emerald' },
-          { label: 'Spent', value: formatMoney(reportData.summary.totalSpent), tone: 'amber' },
+          { label: 'Billable Units', value: String(reportData.summary.totalBillableSubTasks ?? 0), tone: 'cyan' },
+          { label: 'Invoice Total', value: formatMoney(reportData.summary.totalInvoiceAmount), tone: 'emerald' },
           { label: 'Remaining', value: formatMoney(reportData.summary.totalRemaining), tone: 'violet' },
         ];
       case 'worker_performance':
@@ -649,14 +706,14 @@ export function ReportsPage() {
           ),
         },
         {
-          key: 'budget',
-          header: 'Budget',
-          render: (record) => <span className="font-semibold">{formatMoney(record.budget)}</span>,
+          key: 'billableSubTaskCount',
+          header: 'Billable Units',
+          render: (record) => <span className="font-semibold">{record.billableSubTaskCount ?? 0}</span>,
         },
         {
-          key: 'spent',
-          header: 'Spent',
-          render: (record) => <span className="font-semibold">{formatMoney(record.spent)}</span>,
+          key: 'invoiceTotal',
+          header: 'Invoice Total',
+          render: (record) => <span className="font-semibold text-emerald-700">{formatMoney(record.invoiceTotal)}</span>,
         },
         {
           key: 'remaining',
@@ -831,6 +888,12 @@ export function ReportsPage() {
         </div>
       )}
 
+      {saveMessage && (
+        <div className="rounded-2xl border border-emerald-100 bg-emerald-50 px-4 py-3 text-sm text-emerald-700">
+          {saveMessage}
+        </div>
+      )}
+
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
         {REPORTS.map((report) => {
           const Icon = report.icon;
@@ -955,9 +1018,22 @@ export function ReportsPage() {
               <p className="text-sm text-gray-500">{selectedReport.description}</p>
             </div>
             {reportData && (
-              <div className="text-sm text-gray-500">
-                <span className="font-semibold text-gray-900">{reportData.type}</span> report from{' '}
-                {formatPeriodDate(reportData.period.start)} to {formatPeriodDate(reportData.period.end)}
+              <div className="flex flex-col gap-3 md:flex-row md:items-center">
+                <div className="text-sm text-gray-500">
+                  <span className="font-semibold text-gray-900">{reportData.type}</span> report from{' '}
+                  {formatPeriodDate(reportData.period.start)} to {formatPeriodDate(reportData.period.end)}
+                </div>
+                {reportData.type === 'project_invoices' && (authUser?.role === 'admin' || authUser?.role === 'super_admin') && (
+                  <Button
+                    variant="outline"
+                    onClick={handleSaveInvoice}
+                    disabled={isSavingInvoice}
+                    className="border-emerald-200 text-emerald-700 hover:bg-emerald-50"
+                  >
+                    {isSavingInvoice ? <Loader2 className="mr-2 h-4 w-4 animate-spin" /> : <Save className="mr-2 h-4 w-4" />}
+                    Save Invoice
+                  </Button>
+                )}
               </div>
             )}
           </div>
