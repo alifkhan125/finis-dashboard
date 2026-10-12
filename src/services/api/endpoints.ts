@@ -117,7 +117,7 @@ export const API_ENDPOINTS = {
     // TIME TRACKING
     TIME_TRACKING: {
         ATTENDANCE: '/time-tracking/attendance',
-        ADJUSTMENTS: '/time-adjustments/pending',
+        ADJUSTMENTS: '/time-adjustments',
         PENDING_ADJUSTMENTS: '/time-adjustments/pending',
         UPDATE_ADJUSTMENT_STATUS: (id: string) => `/time-adjustments/${id}/status`,
         APPROVE_ADJUSTMENT: (id: string) => `/time-adjustments/${id}/status`,
