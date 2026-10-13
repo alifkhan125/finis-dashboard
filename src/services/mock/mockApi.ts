@@ -26,7 +26,7 @@ import {
 } from './mockData';
 
 // Simulate network delay
-const delay = (ms: number = 500) => new Promise(resolve => setTimeout(resolve, ms));
+const delay = (ms = 500) => new Promise(resolve => setTimeout(resolve, ms));
 
 /**
  * Mock API Service Class

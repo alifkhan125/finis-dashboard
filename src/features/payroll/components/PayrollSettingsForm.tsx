@@ -50,7 +50,7 @@ export function PayrollSettingsForm() {
 
   useEffect(() => {
     if (config) {
-      const cleanRate = (val?: number, fallback: number = 0) => {
+      const cleanRate = (val?: number, fallback = 0) => {
         if (val === undefined || val === null) return fallback;
         return Math.round(val * 100) / 100;
       };

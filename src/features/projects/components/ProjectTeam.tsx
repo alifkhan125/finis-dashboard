@@ -64,7 +64,7 @@ function AddMemberModal({ isOpen, onClose, projectId, type, managers = [], exist
                 await addManager({ projectId, userId: selectedUserId });
                 toast.success('Manager Added', 'Project manager added successfully.');
             } else {
-                let managerId = selectedManagerId || (activeManagers.length > 0 ? (activeManagers[0]?.userId || activeManagers[0]?.id) : undefined);
+                const managerId = selectedManagerId || (activeManagers.length > 0 ? (activeManagers[0]?.userId || activeManagers[0]?.id) : undefined);
                 
                 if (!managerId) {
                     toast.warning('Manager Required', 'Please select a manager to assign this worker to.');

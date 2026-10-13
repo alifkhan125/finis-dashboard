@@ -46,7 +46,7 @@ export function TimeAdjustmentRequestsPage({ embedded = false }: { embedded?: bo
     const fetchRequests = async () => {
         setIsLoading(true);
         try {
-            const res = await apiClient.get<any>(API_ENDPOINTS.TIME_TRACKING.PENDING_ADJUSTMENTS);
+            const res = await apiClient.get<any>(API_ENDPOINTS.TIME_TRACKING.ADJUSTMENTS);
             const raw = res?.data?.data ?? res?.data ?? res;
             const list = Array.isArray(raw) ? raw : [];
             const mapped: TimeAdjustmentRequest[] = list.map((item: any) => ({
