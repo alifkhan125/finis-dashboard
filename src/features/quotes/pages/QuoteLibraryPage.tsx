@@ -885,10 +885,6 @@ export function QuoteLibraryPage() {
         description="Manage categories and master work items for the quotation module."
         icon={Archive}
       >
-        <Button onClick={openCreateQuote}>
-          <Plus className="mr-2 h-4 w-4" />
-          New Quote
-        </Button>
         <Button variant="outline" onClick={openCreateCategory}>
           <Tags className="mr-2 h-4 w-4" />
           New Category
@@ -1289,10 +1285,6 @@ export function QuoteLibraryPage() {
                     ...toSelectOptions(selectorOptions.unitTypes),
                   ]}
                 />
-                <Button onClick={openCreateQuote}>
-                  <Plus className="mr-2 h-4 w-4" />
-                  New Quote
-                </Button>
               </div>
             </div>
           </CardHeader>
