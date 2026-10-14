@@ -13,4 +13,7 @@ export { ProjectDocuments } from './ProjectDocuments';
 export { ProjectStructure } from './ProjectStructure';
 export { ProjectTasks } from './ProjectTasks';
 export { ProjectTeam } from './ProjectTeam';
+export { ProjectStatementView } from './ProjectStatementView';
+export { ProjectInvoicesView } from './ProjectInvoicesView';
+
 

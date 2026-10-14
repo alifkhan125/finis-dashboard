@@ -37,39 +37,53 @@ import { useDebounce } from '@/shared/hooks';
 import { cn } from '@/shared/utils';
 import {
   QuoteSelectorOption,
+  QuoteEstimate,
   QuoteMeasurementType,
   QuoteRecord,
   QuoteWorkCategory,
   QuoteWorkItem,
+  useAcceptAndCreateQuoteEstimateProjectMutation,
   useCreateQuoteMutation,
+  useCreateQuoteEstimateMutation,
   useCreateQuoteMeasurementTypeMutation,
   useCreateQuoteWorkCategoryMutation,
   useCreateQuoteWorkItemMutation,
+  useConvertQuoteEstimateToProjectMutation,
   useDeleteQuoteMutation,
+  useDeleteQuoteEstimateMutation,
   useDisableQuoteWorkCategoryMutation,
   useDisableQuoteMeasurementTypeMutation,
   useDisableQuoteWorkItemMutation,
+  useGetQuoteEstimatesQuery,
   useGetQuotesQuery,
   useGetQuoteSelectorsQuery,
   useGetQuoteMeasurementTypesQuery,
   useGetQuoteWorkCategoriesQuery,
   useGetQuoteWorkItemsQuery,
+  useSendQuoteEstimateMutation,
   useUpdateQuoteMutation,
   useUpdateQuoteWorkCategoryMutation,
   useUpdateQuoteMeasurementTypeMutation,
   useUpdateQuoteWorkItemMutation,
 } from '@/store/quotesApi';
+import { useGetCompaniesQuery } from '@/store/companiesApi';
 
 type TabId = 'builder' | 'overview' | 'quotes' | 'categories' | 'measurements' | 'items';
 
-type BuilderStep = 1 | 2 | 3;
+type BuilderStep = 1 | 2 | 3 | 4;
 
 interface BuilderInfo {
+  companyId: string;
+  projectName: string;
   clientName: string;
   projectAddress: string;
   phoneNumber: string;
   email: string;
   estimatedTime: string;
+  startDate: string;
+  endDate: string;
+  floorsCount: string;
+  unitsPerFloor: string;
   projectType: string;
   propertyType: string;
   unitType: string;
@@ -108,11 +122,17 @@ interface BuilderItemDraft {
 }
 
 const EMPTY_BUILDER_INFO: BuilderInfo = {
+  companyId: '',
+  projectName: '',
   clientName: '',
   projectAddress: '',
   phoneNumber: '',
   email: '',
   estimatedTime: '',
+  startDate: '',
+  endDate: '',
+  floorsCount: '',
+  unitsPerFloor: '',
   projectType: 'new_build',
   propertyType: 'residential',
   unitType: 'apartment',
@@ -208,6 +228,10 @@ function formatMoney(value?: number | null) {
   return `$${value.toFixed(2)}`;
 }
 
+function FieldLabel({ children }: { children: ReactNode }) {
+  return <label className="text-xs font-black uppercase tracking-widest text-gray-400">{children}</label>;
+}
+
 function QuoteFormModal({
   open,
   title,
@@ -246,6 +270,7 @@ export function QuoteLibraryPage() {
   const debouncedItemSearch = useDebounce(itemSearch, 250);
 
   const { data: selectors, isLoading: selectorsLoading } = useGetQuoteSelectorsQuery();
+  const { data: companies = [] } = useGetCompaniesQuery({ limit: 100 });
   const { data: categories = [], isLoading: categoriesLoading } = useGetQuoteWorkCategoriesQuery({
     search: debouncedCategorySearch,
     includeInactive,
@@ -269,8 +294,15 @@ export function QuoteLibraryPage() {
     unitType: unitTypeFilter || undefined,
   });
   const quotes = quoteList?.quotes ?? [];
+  const { data: quoteEstimateList, isLoading: quoteEstimatesLoading } = useGetQuoteEstimatesQuery({ limit: 100 });
+  const quoteEstimates = quoteEstimateList?.data ?? [];
 
   const [createQuote, { isLoading: isCreatingQuote }] = useCreateQuoteMutation();
+  const [createQuoteEstimate, { isLoading: isCreatingQuoteEstimate }] = useCreateQuoteEstimateMutation();
+  const [deleteQuoteEstimate] = useDeleteQuoteEstimateMutation();
+  const [sendQuoteEstimate] = useSendQuoteEstimateMutation();
+  const [acceptAndCreateQuoteEstimateProject] = useAcceptAndCreateQuoteEstimateProjectMutation();
+  const [convertQuoteEstimateToProject] = useConvertQuoteEstimateToProjectMutation();
   const [updateQuote, { isLoading: isUpdatingQuote }] = useUpdateQuoteMutation();
   const [deleteQuote] = useDeleteQuoteMutation();
   const [createCategory, { isLoading: isCreatingCategory }] = useCreateQuoteWorkCategoryMutation();
@@ -336,9 +368,9 @@ export function QuoteLibraryPage() {
   );
 
   const overviewCards = [
-    { label: 'Quotes', value: quoteList?.total ?? quotes.length, hint: 'Saved records', icon: Archive },
+    { label: 'Quotes', value: quoteEstimateList?.meta.total ?? quoteEstimates.length, hint: 'Saved estimates', icon: Archive },
     { label: 'Work Categories', value: categories.length, hint: `${activeCategories} active`, icon: FolderTree },
-    { label: 'Work Items', value: items.length, hint: `${activeItems} active`, icon: Boxes },
+    { label: 'Task / Material Items', value: items.length, hint: `${activeItems} active`, icon: Boxes },
     { label: 'Selector Sets', value: '8', hint: 'Project + property + unit', icon: Layers3 },
     { label: 'Measurement Types', value: measurementTypes.length, hint: `${activeMeasurementTypes} active`, icon: Wrench },
   ];
@@ -388,32 +420,36 @@ export function QuoteLibraryPage() {
   };
 
   const handleGenerateBuilderQuote = async () => {
-    if (!builderInfo.clientName.trim() || !builderInfo.projectAddress.trim() || builderItems.length === 0) return;
+    if (!builderInfo.companyId || !builderInfo.projectName.trim() || !builderInfo.clientName.trim() || !builderInfo.projectAddress.trim() || builderItems.length === 0) return;
 
-    await Promise.all(
-      builderItems.map((item) =>
-        createQuote({
-          workItemId: item.workItemId,
-          projectType: builderInfo.projectType,
-          propertyType: builderInfo.propertyType,
-          unitType: builderInfo.unitType,
-          title: item.title,
-          quantity: Number(item.quantity || 1),
-          unit: item.unit,
-          unitPrice: Number(item.unitPrice || 0),
-          notes: [
-            `Client: ${builderInfo.clientName}`,
-            `Address: ${builderInfo.projectAddress}`,
-            builderInfo.phoneNumber ? `Phone: ${builderInfo.phoneNumber}` : '',
-            builderInfo.email ? `Email: ${builderInfo.email}` : '',
-            builderInfo.estimatedTime ? `Time: ${builderInfo.estimatedTime}` : '',
-          ].filter(Boolean).join('\n'),
-          isCustom: !item.workItemId,
-        }).unwrap(),
-      ),
-    );
+    await createQuoteEstimate({
+      companyId: builderInfo.companyId,
+      projectName: builderInfo.projectName.trim(),
+      clientName: builderInfo.clientName.trim(),
+      clientEmail: builderInfo.email.trim() || undefined,
+      clientPhone: builderInfo.phoneNumber.trim() || undefined,
+      projectAddress: builderInfo.projectAddress.trim(),
+      projectType: builderInfo.projectType,
+      propertyType: builderInfo.propertyType,
+      unitType: builderInfo.unitType,
+      startDate: builderInfo.startDate || undefined,
+      endDate: builderInfo.endDate || undefined,
+      floorsCount: builderInfo.floorsCount ? Number(builderInfo.floorsCount) : undefined,
+      unitsPerFloor: builderInfo.unitsPerFloor ? Number(builderInfo.unitsPerFloor) : undefined,
+      tasks: builderItems.map((item, index) => ({
+        title: item.title,
+        quantity: Number(item.quantity || 1),
+        unit: item.unit,
+        unitPrice: Number(item.unitPrice || 0),
+        estimatedHours: builderInfo.estimatedTime ? Number(builderInfo.estimatedTime) || undefined : undefined,
+        sortOrder: index,
+      })),
+    }).unwrap();
 
-    window.print();
+    setActiveTab('quotes');
+    setBuilderStep(1);
+    setBuilderInfo(EMPTY_BUILDER_INFO);
+    setBuilderItems([]);
   };
 
   const openCreateQuote = () => {
@@ -657,6 +693,102 @@ export function QuoteLibraryPage() {
     if (!window.confirm(`Disable work item "${item.name}"?`)) return;
     await disableItem(item.id).unwrap();
   };
+
+  const handleSendEstimate = async (quote: QuoteEstimate) => {
+    await sendQuoteEstimate(quote.id).unwrap();
+  };
+
+  const handleConvertEstimate = async (quote: QuoteEstimate) => {
+    if (!window.confirm(`Accept quote "${quote.projectName}" and create a project?`)) return;
+    await acceptAndCreateQuoteEstimateProject({
+      id: quote.id,
+      acceptedByName: quote.clientName,
+      notes: 'Accepted from admin dashboard',
+    }).unwrap();
+  };
+
+  const handleSyncEstimateTasks = async (quote: QuoteEstimate) => {
+    if (!window.confirm(`Create missing project tasks from quote "${quote.projectName}"?`)) return;
+    await convertQuoteEstimateToProject(quote.id).unwrap();
+  };
+
+  const handleDeleteEstimate = async (quote: QuoteEstimate) => {
+    if (!window.confirm(`Delete quote "${quote.projectName}"?`)) return;
+    await deleteQuoteEstimate(quote.id).unwrap();
+  };
+
+  const quoteEstimateColumns: Column<QuoteEstimate>[] = [
+    {
+      key: 'projectName',
+      header: 'Quote',
+      render: (quote) => (
+        <div className="space-y-1">
+          <div className="font-semibold text-gray-900">{quote.projectName}</div>
+          <div className="text-xs text-gray-500">{quote.quoteNumber} • {quote.clientName}</div>
+        </div>
+      ),
+    },
+    {
+      key: 'company',
+      header: 'Company',
+      render: (quote) => <span className="font-medium text-gray-700">{quote.company?.name ?? 'N/A'}</span>,
+    },
+    {
+      key: 'scope',
+      header: 'Scope',
+      render: (quote) => (
+        <div className="space-y-1 text-xs font-medium text-gray-600">
+          <div>{normalizeText(quote.projectType)} • {normalizeText(quote.propertyType)}</div>
+          <div>{quote.floorsCount ?? 0} floors • {quote.unitsPerFloor ?? 0} units/floor</div>
+        </div>
+      ),
+    },
+    {
+      key: 'items',
+      header: 'Items',
+      render: (quote) => <Badge variant="secondary">{quote.tasks?.length ?? 0}</Badge>,
+    },
+    {
+      key: 'totalAmount',
+      header: 'Total',
+      render: (quote) => <span className="font-black text-gray-900">{formatMoney(quote.totalAmount)}</span>,
+    },
+    {
+      key: 'status',
+      header: 'Status',
+      render: (quote) => (
+        <Badge className={cn(
+          quote.status === 'converted' && 'bg-emerald-50 text-emerald-700',
+          quote.status === 'accepted' && 'bg-blue-50 text-blue-700',
+          quote.status === 'sent' && 'bg-amber-50 text-amber-700',
+          quote.status === 'rejected' && 'bg-red-50 text-red-700',
+          quote.status === 'draft' && 'bg-gray-100 text-gray-600',
+        )}>
+          {normalizeText(quote.status)}
+        </Badge>
+      ),
+    },
+    {
+      key: 'actions',
+      header: 'Actions',
+      render: (quote) => (
+        <div className="flex flex-wrap gap-2">
+          {quote.status !== 'converted' && quote.status !== 'rejected' && quote.status !== 'cancelled' && (
+            <Button variant="outline" size="sm" onClick={() => handleSendEstimate(quote)}>Send</Button>
+          )}
+          {quote.status !== 'converted' && quote.status !== 'rejected' && quote.status !== 'cancelled' && (
+            <Button variant="outline" size="sm" onClick={() => handleConvertEstimate(quote)}>Accept & Create Project</Button>
+          )}
+          {quote.status === 'converted' && (
+            <Button variant="outline" size="sm" onClick={() => handleSyncEstimateTasks(quote)}>Sync Tasks</Button>
+          )}
+          {quote.status !== 'converted' && (
+            <Button variant="outline" size="sm" onClick={() => handleDeleteEstimate(quote)}>Delete</Button>
+          )}
+        </div>
+      ),
+    },
+  ];
 
   const quoteColumns: Column<QuoteRecord>[] = [
     {
@@ -922,10 +1054,10 @@ export function QuoteLibraryPage() {
         tabs={[
           { id: 'builder', label: 'Quote Builder' },
           { id: 'overview', label: 'Selector Guide' },
-          { id: 'quotes', label: 'Quotes', count: quoteList?.total ?? quotes.length },
+          { id: 'quotes', label: 'Quotes', count: quoteEstimateList?.meta.total ?? quoteEstimates.length },
           { id: 'categories', label: 'Categories', count: categories.length },
           { id: 'measurements', label: 'Measurements', count: measurementTypes.length },
-          { id: 'items', label: 'Work Items', count: items.length },
+          { id: 'items', label: 'Task / Material Items', count: items.length },
         ]}
         activeTab={activeTab}
         onTabChange={(tabId) => setActiveTab(tabId as TabId)}
@@ -938,10 +1070,10 @@ export function QuoteLibraryPage() {
               <div className="flex flex-col gap-5 lg:flex-row lg:items-center lg:justify-between">
                 <div>
                   <h2 className="text-2xl font-black text-gray-900">Construction Quote Builder</h2>
-                  <p className="mt-1 text-sm font-medium text-gray-500">Create the full client quote from the dashboard.</p>
+                  <p className="mt-1 text-sm font-medium text-gray-500">Create project-style estimates with task, labor, material, and inventory lines.</p>
                 </div>
                 <div className="flex items-center gap-3">
-                  {[1, 2, 3].map((stepNumber) => (
+                  {[1, 2, 3, 4].map((stepNumber) => (
                     <button
                       key={stepNumber}
                       type="button"
@@ -969,11 +1101,39 @@ export function QuoteLibraryPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <Input value={builderInfo.clientName} onChange={(e) => setBuilderField('clientName', e.target.value)} placeholder="Client Name *" />
-                  <Input value={builderInfo.projectAddress} onChange={(e) => setBuilderField('projectAddress', e.target.value)} placeholder="Project Address *" />
-                  <Input value={builderInfo.phoneNumber} onChange={(e) => setBuilderField('phoneNumber', e.target.value)} placeholder="Phone Number" />
-                  <Input value={builderInfo.email} onChange={(e) => setBuilderField('email', e.target.value)} placeholder="Email" />
-                  <Input value={builderInfo.estimatedTime} onChange={(e) => setBuilderField('estimatedTime', e.target.value)} placeholder="Time Hours / Estimated Timeline" />
+                  <div className="space-y-2">
+                    <FieldLabel>Under Company *</FieldLabel>
+                    <Select
+                      value={builderInfo.companyId}
+                      onChange={(e) => setBuilderField('companyId', e.target.value)}
+                      placeholder="Select company"
+                      options={companies.map((company) => ({ value: company.id, label: company.name }))}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <FieldLabel>Project Name *</FieldLabel>
+                    <Input value={builderInfo.projectName} onChange={(e) => setBuilderField('projectName', e.target.value)} placeholder="Enter project name" />
+                  </div>
+                  <div className="space-y-2">
+                    <FieldLabel>Client Name *</FieldLabel>
+                    <Input value={builderInfo.clientName} onChange={(e) => setBuilderField('clientName', e.target.value)} placeholder="Enter client name" />
+                  </div>
+                  <div className="space-y-2">
+                    <FieldLabel>Project Address *</FieldLabel>
+                    <Input value={builderInfo.projectAddress} onChange={(e) => setBuilderField('projectAddress', e.target.value)} placeholder="Enter full project address" />
+                  </div>
+                  <div className="space-y-2">
+                    <FieldLabel>Phone Number</FieldLabel>
+                    <Input value={builderInfo.phoneNumber} onChange={(e) => setBuilderField('phoneNumber', e.target.value)} placeholder="Enter phone number" />
+                  </div>
+                  <div className="space-y-2">
+                    <FieldLabel>Email</FieldLabel>
+                    <Input value={builderInfo.email} onChange={(e) => setBuilderField('email', e.target.value)} placeholder="Enter email address" />
+                  </div>
+                  <div className="space-y-2">
+                    <FieldLabel>Estimated Hours</FieldLabel>
+                    <Input type="number" min="0" step="0.25" value={builderInfo.estimatedTime} onChange={(e) => setBuilderField('estimatedTime', e.target.value)} placeholder="Enter estimated hours" />
+                  </div>
                 </CardContent>
               </Card>
 
@@ -985,28 +1145,57 @@ export function QuoteLibraryPage() {
                   </CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
-                  <Select
-                    value={builderInfo.projectType}
-                    onChange={(e) => setBuilderField('projectType', e.target.value)}
-                    placeholder="Project type"
-                    options={toSelectOptions(selectorOptions.projectTypes)}
-                  />
-                  <Select
-                    value={builderInfo.propertyType}
-                    onChange={(e) => setBuilderField('propertyType', e.target.value)}
-                    placeholder="Property type"
-                    options={toSelectOptions(selectorOptions.propertyTypes)}
-                  />
-                  <Select
-                    value={builderInfo.unitType}
-                    onChange={(e) => setBuilderField('unitType', e.target.value)}
-                    placeholder="Unit type"
-                    options={toSelectOptions(selectorOptions.unitTypes)}
-                  />
+                  <div className="space-y-2">
+                    <FieldLabel>Project Type</FieldLabel>
+                    <Select
+                      value={builderInfo.projectType}
+                      onChange={(e) => setBuilderField('projectType', e.target.value)}
+                      placeholder="Select project type"
+                      options={toSelectOptions(selectorOptions.projectTypes)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <FieldLabel>Property Type</FieldLabel>
+                    <Select
+                      value={builderInfo.propertyType}
+                      onChange={(e) => setBuilderField('propertyType', e.target.value)}
+                      placeholder="Select property type"
+                      options={toSelectOptions(selectorOptions.propertyTypes)}
+                    />
+                  </div>
+                  <div className="space-y-2">
+                    <FieldLabel>Unit Type</FieldLabel>
+                    <Select
+                      value={builderInfo.unitType}
+                      onChange={(e) => setBuilderField('unitType', e.target.value)}
+                      placeholder="Select unit type"
+                      options={toSelectOptions(selectorOptions.unitTypes)}
+                    />
+                  </div>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <FieldLabel>Start Date</FieldLabel>
+                      <Input type="date" value={builderInfo.startDate} onChange={(e) => setBuilderField('startDate', e.target.value)} />
+                    </div>
+                    <div className="space-y-2">
+                      <FieldLabel>End Date</FieldLabel>
+                      <Input type="date" value={builderInfo.endDate} onChange={(e) => setBuilderField('endDate', e.target.value)} />
+                    </div>
+                  </div>
+                  <div className="grid gap-4 md:grid-cols-2">
+                    <div className="space-y-2">
+                      <FieldLabel>Floors Count</FieldLabel>
+                      <Input type="number" min="0" value={builderInfo.floorsCount} onChange={(e) => setBuilderField('floorsCount', e.target.value)} placeholder="Enter floors count" />
+                    </div>
+                    <div className="space-y-2">
+                      <FieldLabel>Units Per Floor</FieldLabel>
+                      <Input type="number" min="0" value={builderInfo.unitsPerFloor} onChange={(e) => setBuilderField('unitsPerFloor', e.target.value)} placeholder="Enter units per floor" />
+                    </div>
+                  </div>
                   <Button
                     className="w-full"
                     onClick={() => setBuilderStep(2)}
-                    disabled={!builderInfo.clientName.trim() || !builderInfo.projectAddress.trim()}
+                    disabled={!builderInfo.companyId || !builderInfo.projectName.trim() || !builderInfo.clientName.trim() || !builderInfo.projectAddress.trim()}
                   >
                     Next
                   </Button>
@@ -1023,20 +1212,20 @@ export function QuoteLibraryPage() {
                     <div>
                       <CardTitle className="flex items-center gap-2">
                         <Wrench className="h-5 w-5 text-[#1D4F6D]" />
-                        Select Services
+                        Add Tasks, Labor, Materials
                       </CardTitle>
-                      <CardDescription>Add library services or custom quote items.</CardDescription>
+                      <CardDescription>Add task cost, worker/labor cost, material cost, or inventory items as quote lines.</CardDescription>
                     </div>
                     <Button onClick={openBuilderItemModal}>
                       <Plus className="mr-2 h-4 w-4" />
-                      Add Custom Item
+                      Add Service
                     </Button>
                   </div>
                 </CardHeader>
                 <CardContent className="space-y-4">
                   {builderItems.length === 0 ? (
                     <div className="rounded-2xl border border-dashed border-gray-200 bg-gray-50 p-8 text-center text-sm font-medium text-gray-500">
-                      No quote items added yet.
+                      No task, labor, material, or inventory line added yet.
                     </div>
                   ) : (
                     <div className="space-y-3">
@@ -1072,7 +1261,7 @@ export function QuoteLibraryPage() {
                   <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4">
                     <div className="grid gap-4 text-center sm:grid-cols-3">
                       <div>
-                        <p className="text-xs font-black uppercase tracking-widest text-gray-400">Items Selected</p>
+                        <p className="text-xs font-black uppercase tracking-widest text-gray-400">Lines Selected</p>
                         <p className="mt-1 text-2xl font-black text-[#1D4F6D]">{builderItems.length}</p>
                       </div>
                       <div>
@@ -1106,6 +1295,14 @@ export function QuoteLibraryPage() {
                 </CardHeader>
                 <CardContent className="grid gap-4 md:grid-cols-2">
                   <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4">
+                    <p className="text-xs font-black uppercase tracking-widest text-gray-400">Project</p>
+                    <p className="mt-1 font-black text-gray-900">{builderInfo.projectName || 'N/A'}</p>
+                  </div>
+                  <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4">
+                    <p className="text-xs font-black uppercase tracking-widest text-gray-400">Company</p>
+                    <p className="mt-1 font-black text-gray-900">{companies.find((company) => company.id === builderInfo.companyId)?.name || 'N/A'}</p>
+                  </div>
+                  <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4">
                     <p className="text-xs font-black uppercase tracking-widest text-gray-400">Client</p>
                     <p className="mt-1 font-black text-gray-900">{builderInfo.clientName || 'N/A'}</p>
                   </div>
@@ -1123,12 +1320,18 @@ export function QuoteLibraryPage() {
                       {normalizeText(builderInfo.projectType)} • {normalizeText(builderInfo.propertyType)} • {normalizeText(builderInfo.unitType)}
                     </p>
                   </div>
+                  <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4">
+                    <p className="text-xs font-black uppercase tracking-widest text-gray-400">Planning</p>
+                    <p className="mt-1 font-black text-gray-900">
+                      {builderInfo.floorsCount || 0} floors • {builderInfo.unitsPerFloor || 0} units/floor
+                    </p>
+                  </div>
                 </CardContent>
               </Card>
 
               <Card className="border-gray-100 shadow-sm">
                 <CardHeader>
-                  <CardTitle>Selected Work Items</CardTitle>
+                  <CardTitle>Selected Quote Lines</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-3">
                   {builderItems.map((item) => (
@@ -1141,7 +1344,7 @@ export function QuoteLibraryPage() {
                     </div>
                   ))}
                   <div className="flex items-center justify-between border-t border-gray-100 pt-4 text-lg font-black">
-                    <span>Work Items Subtotal</span>
+                    <span>Quote Lines Subtotal</span>
                     <span>{formatMoney(builderSubtotal)}</span>
                   </div>
                 </CardContent>
@@ -1153,18 +1356,56 @@ export function QuoteLibraryPage() {
                 </CardHeader>
                 <CardContent className="grid gap-4 md:grid-cols-2">
                   <div className="flex items-center gap-3"><CalendarDays className="h-5 w-5 text-[#1D4F6D]" /><span>Valid Until: <b>{quoteValidUntil}</b></span></div>
+                  <div className="flex items-center gap-3"><CalendarDays className="h-5 w-5 text-[#1D4F6D]" /><span>Schedule: <b>{builderInfo.startDate || 'N/A'} - {builderInfo.endDate || 'N/A'}</b></span></div>
                   <div className="flex items-center gap-3"><Mail className="h-5 w-5 text-[#1D4F6D]" /><span>Email: <b>{builderInfo.email || 'N/A'}</b></span></div>
-                  <div className="flex items-center gap-3"><FileText className="h-5 w-5 text-[#1D4F6D]" /><span>Total Work Items: <b>{builderItems.length}</b></span></div>
+                  <div className="flex items-center gap-3"><FileText className="h-5 w-5 text-[#1D4F6D]" /><span>Total Quote Lines: <b>{builderItems.length}</b></span></div>
                   <div className="flex items-center gap-3"><DollarSign className="h-5 w-5 text-[#1D4F6D]" /><span>Final Total: <b>{formatMoney(builderSubtotal)}</b></span></div>
                 </CardContent>
               </Card>
 
               <div className="flex flex-col gap-3 sm:flex-row">
                 <Button variant="outline" className="flex-1" onClick={() => setBuilderStep(2)}>Back</Button>
-                <Button className="flex-1" onClick={handleGenerateBuilderQuote} disabled={builderItems.length === 0 || isCreatingQuote}>
-                  Generate Quote and Save
-                </Button>
+                <Button className="flex-1" onClick={() => setBuilderStep(4)} disabled={builderItems.length === 0}>Next</Button>
               </div>
+            </div>
+          )}
+
+          {builderStep === 4 && (
+            <div className="space-y-6">
+              <Card className="border-gray-100 shadow-sm">
+                <CardHeader>
+                  <CardTitle className="flex items-center gap-2">
+                    <CheckCircle2 className="h-5 w-5 text-[#1D4F6D]" />
+                    Finalize Quote
+                  </CardTitle>
+                  <CardDescription>Save the estimate first. The saved quote can then be sent as a branded PDF from the quote list.</CardDescription>
+                </CardHeader>
+                <CardContent className="space-y-4">
+                  <div className="grid gap-4 md:grid-cols-3">
+                    <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4">
+                      <p className="text-xs font-black uppercase tracking-widest text-gray-400">Client</p>
+                      <p className="mt-1 font-black text-gray-900">{builderInfo.clientName || 'N/A'}</p>
+                    </div>
+                    <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4">
+                      <p className="text-xs font-black uppercase tracking-widest text-gray-400">Quote Lines</p>
+                      <p className="mt-1 font-black text-gray-900">{builderItems.length}</p>
+                    </div>
+                    <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4">
+                      <p className="text-xs font-black uppercase tracking-widest text-gray-400">Final Total</p>
+                      <p className="mt-1 font-black text-gray-900">{formatMoney(builderSubtotal)}</p>
+                    </div>
+                  </div>
+                  <div className="rounded-2xl border border-blue-100 bg-blue-50 p-4 text-sm font-medium text-blue-900">
+                    After saving, use the Send action in the Quotes list to email the branded PDF directly to the client.
+                  </div>
+                  <div className="flex flex-col gap-3 sm:flex-row">
+                    <Button variant="outline" className="flex-1" onClick={() => setBuilderStep(3)}>Back</Button>
+                    <Button className="flex-1" onClick={handleGenerateBuilderQuote} disabled={builderItems.length === 0 || isCreatingQuoteEstimate}>
+                      Generate Quote and Save
+                    </Button>
+                  </div>
+                </CardContent>
+              </Card>
             </div>
           )}
         </div>
@@ -1255,7 +1496,7 @@ export function QuoteLibraryPage() {
                   <Archive className="h-5 w-5 text-[#1D4F6D]" />
                   Quotes
                 </CardTitle>
-                <CardDescription>Create and manage saved quote records from library or custom pricing.</CardDescription>
+                <CardDescription>Create and manage full quote estimates, then convert accepted quotes to projects.</CardDescription>
               </div>
               <div className="grid gap-3 lg:grid-cols-4">
                 <Select
@@ -1289,14 +1530,14 @@ export function QuoteLibraryPage() {
             </div>
           </CardHeader>
           <CardContent className="space-y-4">
-            {quotesLoading ? (
+            {quoteEstimatesLoading ? (
               <div className="flex min-h-[240px] items-center justify-center">
                 <div className="h-10 w-10 animate-spin rounded-full border-4 border-[#1D4F6D] border-t-transparent" />
               </div>
             ) : (
               <Table
-                data={quotes}
-                columns={quoteColumns}
+                data={quoteEstimates}
+                columns={quoteEstimateColumns}
                 className="shadow-none border-0"
               />
             )}
@@ -1399,7 +1640,7 @@ export function QuoteLibraryPage() {
               <div>
                 <CardTitle className="flex items-center gap-2">
                   <Wrench className="h-5 w-5 text-[#1D4F6D]" />
-                  Work Items
+                  Task / Material Items
                 </CardTitle>
                 <CardDescription>Search the master list or filter by selector combination.</CardDescription>
               </div>
@@ -1475,17 +1716,17 @@ export function QuoteLibraryPage() {
       <QuoteFormModal
         open={builderItemModalOpen}
         onClose={() => setBuilderItemModalOpen(false)}
-        title="Add Quote Item"
+        title="Add Service"
       >
         <form className="space-y-5" onSubmit={(event) => { event.preventDefault(); handleAddBuilderItem(); }}>
           <div className="space-y-2">
-            <label className="text-xs font-black uppercase tracking-widest text-gray-400">Library Service</label>
+            <label className="text-xs font-black uppercase tracking-widest text-gray-400">Library Task / Material</label>
             <Select
               value={builderItemDraft.workItemId}
               onChange={(e) => applyBuilderWorkItem(e.target.value)}
-              placeholder="Select service or create custom"
+              placeholder="Select saved task/material or create custom"
               options={[
-                { value: '', label: 'Custom Item' },
+                { value: '', label: 'Custom Task / Material' },
                 ...items.map((item) => ({
                   value: item.id,
                   label: `${item.name} - ${formatMoney(item.unitCost ?? null)}`,
@@ -1494,11 +1735,11 @@ export function QuoteLibraryPage() {
             />
           </div>
           <div className="space-y-2">
-            <label className="text-xs font-black uppercase tracking-widest text-gray-400">Service Name</label>
+            <label className="text-xs font-black uppercase tracking-widest text-gray-400">Task / Material Name</label>
             <Input
               value={builderItemDraft.title}
               onChange={(e) => setBuilderItemDraft((draft) => ({ ...draft, title: e.target.value }))}
-              placeholder="Service"
+              placeholder="e.g. Drywall install, paint labor, cement, tiles"
               autoFocus
             />
           </div>
@@ -1518,7 +1759,7 @@ export function QuoteLibraryPage() {
               <Input
                 value={builderItemDraft.unit}
                 onChange={(e) => setBuilderItemDraft((draft) => ({ ...draft, unit: e.target.value }))}
-                placeholder="kg / room / sqft"
+                placeholder="hour / room / sqft / bag / piece"
               />
             </div>
             <div className="space-y-2">
@@ -1544,7 +1785,7 @@ export function QuoteLibraryPage() {
               Cancel
             </Button>
             <Button type="submit" disabled={!builderItemDraft.title.trim()}>
-              Add Item
+              Add Service
             </Button>
           </div>
         </form>

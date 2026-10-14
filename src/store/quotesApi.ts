@@ -111,6 +111,112 @@ export interface QuoteListResponse {
   requestedBy: string;
 }
 
+export type QuoteEstimateStatus = 'draft' | 'sent' | 'accepted' | 'converted' | 'rejected' | 'cancelled';
+
+export interface QuoteEstimateTask {
+  id: string;
+  quoteEstimateId: string;
+  title: string;
+  description?: string | null;
+  floorNumber?: number | null;
+  unitName?: string | null;
+  quantity: number;
+  unit?: string | null;
+  estimatedHours?: number | null;
+  unitPrice: number;
+  totalPrice: number;
+  sortOrder: number;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export interface QuoteEstimate {
+  id: string;
+  quoteNumber: string;
+  companyId: string;
+  projectName: string;
+  clientName: string;
+  clientEmail?: string | null;
+  clientPhone?: string | null;
+  projectAddress?: string | null;
+  projectType?: string | null;
+  propertyType?: string | null;
+  unitType?: string | null;
+  startDate?: string | null;
+  endDate?: string | null;
+  floorsCount?: number | null;
+  unitsPerFloor?: number | null;
+  totalUnits?: number | null;
+  subtotal: number;
+  discountAmount: number;
+  taxAmount: number;
+  totalAmount: number;
+  status: QuoteEstimateStatus;
+  sentAt?: string | null;
+  acceptedAt?: string | null;
+  rejectedAt?: string | null;
+  convertedProjectId?: string | null;
+  createdById: string;
+  createdAt: string;
+  updatedAt: string;
+  company?: { id: string; name: string };
+  convertedProject?: { id: string; name: string; status: string } | null;
+  tasks: QuoteEstimateTask[];
+}
+
+export interface QuoteEstimateListResponse {
+  data: QuoteEstimate[];
+  meta: {
+    page: number;
+    limit: number;
+    total: number;
+    totalPages: number;
+  };
+}
+
+export interface CreateQuoteEstimateTaskPayload {
+  title: string;
+  description?: string;
+  floorNumber?: number;
+  unitName?: string;
+  quantity?: number;
+  unit?: string;
+  estimatedHours?: number;
+  unitPrice?: number;
+  sortOrder?: number;
+}
+
+export interface CreateQuoteEstimatePayload {
+  companyId: string;
+  projectName: string;
+  clientName: string;
+  clientEmail?: string;
+  clientPhone?: string;
+  projectAddress?: string;
+  projectType?: string;
+  propertyType?: string;
+  unitType?: string;
+  startDate?: string;
+  endDate?: string;
+  floorsCount?: number;
+  unitsPerFloor?: number;
+  discountAmount?: number;
+  taxAmount?: number;
+  tasks?: CreateQuoteEstimateTaskPayload[];
+}
+
+export type UpdateQuoteEstimatePayload = Partial<CreateQuoteEstimatePayload> & {
+  status?: QuoteEstimateStatus;
+};
+
+export interface QuoteEstimateFilters {
+  companyId?: string;
+  status?: QuoteEstimateStatus;
+  search?: string;
+  page?: number;
+  limit?: number;
+}
+
 export interface CreateQuotePayload {
   projectType?: string;
   propertyType?: string;
@@ -198,7 +304,7 @@ const baseQuery = fetchBaseQuery({
 export const quotesApi = createApi({
   reducerPath: 'quotesApi',
   baseQuery,
-  tagTypes: ['QuoteLibrary'],
+  tagTypes: ['QuoteLibrary', 'QuoteEstimates'],
   endpoints: (builder) => ({
     getQuoteSelectors: builder.query<QuoteSelectorsResponse, void>({
       query: () => API_ENDPOINTS.QUOTES.SELECTORS,
@@ -399,6 +505,91 @@ export const quotesApi = createApi({
       }),
       invalidatesTags: ['QuoteLibrary'],
     }),
+    getQuoteEstimates: builder.query<QuoteEstimateListResponse, QuoteEstimateFilters | void>({
+      query: (params) => {
+        const filters = params || {};
+        return {
+          url: API_ENDPOINTS.QUOTE_ESTIMATES.LIST,
+          params: {
+            ...(filters.companyId ? { companyId: filters.companyId } : {}),
+            ...(filters.status ? { status: filters.status } : {}),
+            ...(filters.search ? { search: filters.search } : {}),
+            ...(filters.page ? { page: filters.page } : {}),
+            ...(filters.limit ? { limit: filters.limit } : {}),
+          },
+        };
+      },
+      transformResponse: (response: ApiEnvelope<QuoteEstimateListResponse> | QuoteEstimateListResponse): QuoteEstimateListResponse => {
+        if (response && typeof response === 'object' && 'meta' in response) return response as QuoteEstimateListResponse;
+        if (response && typeof response === 'object' && 'data' in response) return response.data as QuoteEstimateListResponse;
+        return response as QuoteEstimateListResponse;
+      },
+      providesTags: ['QuoteEstimates'],
+    }),
+    createQuoteEstimate: builder.mutation<{ message: string; quote: QuoteEstimate }, CreateQuoteEstimatePayload>({
+      query: (body) => ({
+        url: API_ENDPOINTS.QUOTE_ESTIMATES.CREATE,
+        method: 'POST',
+        body,
+      }),
+      transformResponse: (response: ApiEnvelope<{ message: string; quote: QuoteEstimate }> | { message: string; quote: QuoteEstimate }) => {
+        if (response && typeof response === 'object' && 'data' in response) return response.data;
+        return response as { message: string; quote: QuoteEstimate };
+      },
+      invalidatesTags: ['QuoteEstimates'],
+    }),
+    updateQuoteEstimate: builder.mutation<{ message: string; quote: QuoteEstimate }, { id: string; data: UpdateQuoteEstimatePayload }>({
+      query: ({ id, data }) => ({
+        url: API_ENDPOINTS.QUOTE_ESTIMATES.UPDATE(id),
+        method: 'PATCH',
+        body: data,
+      }),
+      transformResponse: (response: ApiEnvelope<{ message: string; quote: QuoteEstimate }> | { message: string; quote: QuoteEstimate }) => {
+        if (response && typeof response === 'object' && 'data' in response) return response.data;
+        return response as { message: string; quote: QuoteEstimate };
+      },
+      invalidatesTags: ['QuoteEstimates'],
+    }),
+    deleteQuoteEstimate: builder.mutation<{ message: string; id: string }, string>({
+      query: (id) => ({
+        url: API_ENDPOINTS.QUOTE_ESTIMATES.DELETE(id),
+        method: 'DELETE',
+      }),
+      invalidatesTags: ['QuoteEstimates'],
+    }),
+    sendQuoteEstimate: builder.mutation<{ message: string; quote: QuoteEstimate }, string>({
+      query: (id) => ({
+        url: API_ENDPOINTS.QUOTE_ESTIMATES.SEND(id),
+        method: 'POST',
+      }),
+      invalidatesTags: ['QuoteEstimates'],
+    }),
+    acceptQuoteEstimate: builder.mutation<{ message: string; quote: QuoteEstimate }, { id: string; acceptedByName?: string; notes?: string }>({
+      query: ({ id, ...body }) => ({
+        url: API_ENDPOINTS.QUOTE_ESTIMATES.ACCEPT(id),
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['QuoteEstimates'],
+    }),
+    convertQuoteEstimateToProject: builder.mutation<{ message: string; quote: QuoteEstimate; project: { id: string; name: string } }, string>({
+      query: (id) => ({
+        url: API_ENDPOINTS.QUOTE_ESTIMATES.CONVERT_TO_PROJECT(id),
+        method: 'POST',
+      }),
+      invalidatesTags: ['QuoteEstimates'],
+    }),
+    acceptAndCreateQuoteEstimateProject: builder.mutation<
+      { message: string; quote: QuoteEstimate; project: { id: string; name: string } },
+      { id: string; acceptedByName?: string; notes?: string }
+    >({
+      query: ({ id, ...body }) => ({
+        url: API_ENDPOINTS.QUOTE_ESTIMATES.ACCEPT_AND_CREATE_PROJECT(id),
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['QuoteEstimates'],
+    }),
   }),
 });
 
@@ -420,4 +611,12 @@ export const {
   useCreateQuoteMutation,
   useUpdateQuoteMutation,
   useDeleteQuoteMutation,
+  useGetQuoteEstimatesQuery,
+  useCreateQuoteEstimateMutation,
+  useUpdateQuoteEstimateMutation,
+  useDeleteQuoteEstimateMutation,
+  useSendQuoteEstimateMutation,
+  useAcceptQuoteEstimateMutation,
+  useConvertQuoteEstimateToProjectMutation,
+  useAcceptAndCreateQuoteEstimateProjectMutation,
 } = quotesApi;

@@ -10,6 +10,8 @@ import { ProjectTeam } from '../components/ProjectTeam';
 import { ProjectDocuments } from '../components/ProjectDocuments';
 import { ProjectStructure } from '../components/ProjectStructure';
 import { ProjectTasks } from '../components/ProjectTasks';
+import { ProjectStatementView } from '../components/ProjectStatementView';
+import { ProjectInvoicesView } from '../components/ProjectInvoicesView';
 import { ProjectReportView } from '../components/ProjectReportView';
 import { FinancialAnalysisChart } from '../components/FinancialAnalysisChart';
 import { CreateProjectModal } from '../components/CreateProjectModal';
@@ -120,6 +122,13 @@ export function ProjectDetailPage() {
   ];
   if (!isSuperAdmin) {
     tabs.splice(2, 0, { id: 'team', label: 'Team', count: teamCount || undefined });
+  }
+  const isAdmin = authUser?.role === 'admin' || isSuperAdmin;
+  if (isAdmin) {
+    tabs.push(
+      { id: 'statement', label: 'Financial Statement' },
+      { id: 'invoices', label: 'Invoices & Billing' }
+    );
   }
 
   // Client info from real API
@@ -495,6 +504,14 @@ export function ProjectDetailPage() {
 
         {!isSuperAdmin && activeTab === 'team' && <ProjectTeam />}
         {activeTab === 'documents' && <ProjectDocuments />}
+
+        {isAdmin && activeTab === 'statement' && (
+          <ProjectStatementView projectId={project.id} />
+        )}
+
+        {isAdmin && activeTab === 'invoices' && (
+          <ProjectInvoicesView projectId={project.id} />
+        )}
       </div>
 
       {/* Modals */}

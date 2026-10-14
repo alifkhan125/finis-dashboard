@@ -197,6 +197,21 @@ export const API_ENDPOINTS = {
         WORK_ITEM: (id: string) => `/manager/quotes/work-items/${id}`,
     },
 
+    // QUOTE ESTIMATES (Admin)
+    QUOTE_ESTIMATES: {
+        LIST: '/admin/quote-estimates',
+        DETAIL: (id: string) => `/admin/quote-estimates/${id}`,
+        CREATE: '/admin/quote-estimates',
+        UPDATE: (id: string) => `/admin/quote-estimates/${id}`,
+        DELETE: (id: string) => `/admin/quote-estimates/${id}`,
+        SEND: (id: string) => `/admin/quote-estimates/${id}/send`,
+        ACCEPT: (id: string) => `/admin/quote-estimates/${id}/accept`,
+        REJECT: (id: string) => `/admin/quote-estimates/${id}/reject`,
+        CANCEL: (id: string) => `/admin/quote-estimates/${id}/cancel`,
+        CONVERT_TO_PROJECT: (id: string) => `/admin/quote-estimates/${id}/convert-to-project`,
+        ACCEPT_AND_CREATE_PROJECT: (id: string) => `/admin/quote-estimates/${id}/accept-and-create-project`,
+    },
+
     // TENANTS
     TENANTS: {
         LIST: '/tenants',
