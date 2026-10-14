@@ -10,6 +10,7 @@ import type { ApiError, ApiResponse } from '@/shared/types';
 
 interface RequestConfig extends RequestInit {
     params?: Record<string, string | number | boolean>;
+    responseType?: 'json' | 'text' | 'blob' | 'arraybuffer';
 }
 
 class ApiClient {
@@ -62,28 +63,42 @@ class ApiClient {
     /**
      * Handle API response
      */
-    private async handleResponse<T>(response: Response): Promise<ApiResponse<T>> {
-        const contentType = response.headers.get('content-type');
-        const isJson = contentType?.includes('application/json');
-
-        let data: T;
-        if (isJson) {
-            data = await response.json();
-        } else {
-            data = (await response.text()) as unknown as T;
-        }
+    private async handleResponse<T>(response: Response, config?: RequestConfig): Promise<ApiResponse<T>> {
+        const contentType = response.headers.get('content-type') || '';
+        const isJson = contentType.includes('application/json');
+        const isBlob =
+            config?.responseType === 'blob' ||
+            contentType.includes('application/pdf') ||
+            contentType.includes('application/octet-stream') ||
+            contentType.includes('image/');
 
         if (!response.ok) {
-            const serverMessage = isJson && typeof data === 'object' && data !== null
-                ? (data as any).message || (data as any).error
-                : undefined;
+            let serverMessage: any = undefined;
+            try {
+                if (isJson) {
+                    const json = await response.json();
+                    serverMessage = json?.message || json?.error;
+                } else {
+                    serverMessage = await response.text();
+                }
+            } catch (_) {}
+
             const error: ApiError = {
                 code: `HTTP_${response.status}`,
                 message: (Array.isArray(serverMessage) ? serverMessage.join(', ') : serverMessage) || response.statusText,
                 statusCode: response.status,
-                details: isJson ? (data as any) : undefined,
+                details: isJson && typeof serverMessage === 'object' ? serverMessage : undefined,
             };
             throw error;
+        }
+
+        let data: T;
+        if (isBlob) {
+            data = (await response.blob()) as unknown as T;
+        } else if (isJson) {
+            data = await response.json();
+        } else {
+            data = (await response.text()) as unknown as T;
         }
 
         return {
@@ -125,7 +140,7 @@ class ApiClient {
                 },
             });
 
-            return await this.handleResponse<T>(response);
+            return await this.handleResponse<T>(response, config);
         } catch (error) {
             return this.handleError(error);
         }
@@ -134,8 +149,34 @@ class ApiClient {
     /**
      * GET request
      */
-    async get<T>(endpoint: string, params?: Record<string, string | number | boolean>): Promise<ApiResponse<T>> {
-        return this.request<T>(endpoint, { method: 'GET', params });
+    async get<T>(
+        endpoint: string,
+        configOrParams?: Record<string, any> | RequestConfig
+    ): Promise<ApiResponse<T>> {
+        let config: RequestConfig = { method: 'GET' };
+        if (configOrParams) {
+            if ('responseType' in configOrParams || 'headers' in configOrParams || 'params' in configOrParams) {
+                config = { ...config, ...(configOrParams as RequestConfig), method: 'GET' };
+            } else {
+                config.params = configOrParams as Record<string, string | number | boolean>;
+            }
+        }
+        return this.request<T>(endpoint, config);
+    }
+
+    /**
+     * Direct Blob Download
+     */
+    async downloadBlob(
+        endpoint: string,
+        params?: Record<string, string | number | boolean>
+    ): Promise<Blob> {
+        const res = await this.request<Blob>(endpoint, {
+            method: 'GET',
+            params,
+            responseType: 'blob',
+        });
+        return res.data;
     }
 
     /**

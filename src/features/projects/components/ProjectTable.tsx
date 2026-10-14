@@ -94,7 +94,7 @@ export function ProjectTable({
   }, {
     key: 'status',
     header: 'Status',
-    render: (project) => <Badge variant={getStatusColor(project.status)} className="capitalize">{project.status.replace('_', ' ')}</Badge>
+    render: (project) => <Badge variant={getStatusColor(project.status)} className="capitalize">{project.status === 'active' ? 'In Progress' : project.status.replace('_', ' ')}</Badge>
   }, {
     key: 'progress',
     header: 'Progress',

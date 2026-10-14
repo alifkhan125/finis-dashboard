@@ -252,7 +252,7 @@ export function ProjectInvoicesView({ projectId }: ProjectInvoicesViewProps) {
       const res = await apiClient.get<Blob>(`/admin/invoices/${inv.id}/export`, {
         responseType: 'blob',
       });
-      const blob = new Blob([res.data as any], { type: 'application/pdf' });
+      const blob = res.data instanceof Blob ? res.data : new Blob([res.data as any], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;
@@ -286,7 +286,7 @@ export function ProjectInvoicesView({ projectId }: ProjectInvoicesViewProps) {
       const res = await apiClient.get<Blob>(`/admin/invoices/payments/${p.id}/receipt`, {
         responseType: 'blob',
       });
-      const blob = new Blob([res.data as any], { type: 'application/pdf' });
+      const blob = res.data instanceof Blob ? res.data : new Blob([res.data as any], { type: 'application/pdf' });
       const url = window.URL.createObjectURL(blob);
       const link = document.createElement('a');
       link.href = url;

@@ -68,7 +68,9 @@ export function ProjectCard({
       <div className="space-y-1">
         <div className="flex items-center gap-2 mb-2">
           <Badge variant={getStatusColor(project.status)}>
-            {project.status.charAt(0).toUpperCase() + project.status.slice(1).replace('_', ' ')}
+            {project.status === 'active'
+              ? 'In Progress'
+              : project.status.charAt(0).toUpperCase() + project.status.slice(1).replace('_', ' ')}
           </Badge>
           <div className="flex items-center gap-1 px-2 py-0.5 rounded-full bg-gray-100 text-[10px] font-bold text-gray-600 uppercase tracking-wide border border-gray-200">
             {getProjectIcon()}

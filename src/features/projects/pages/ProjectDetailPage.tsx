@@ -173,8 +173,19 @@ export function ProjectDetailPage() {
               <h1 className="text-3xl font-extrabold text-gray-900 tracking-tight">
                 {project.name}
               </h1>
-              <Badge variant="default" className="px-3 py-1 rounded-full font-bold uppercase tracking-wider text-[10px]">
-                {project.status}
+              <Badge
+                variant={
+                  project.status === 'completed'
+                    ? 'success'
+                    : project.status === 'active'
+                      ? 'default'
+                      : 'info'
+                }
+                className="px-3 py-1 rounded-full font-bold uppercase tracking-wider text-[10px]"
+              >
+                {project.status === 'active'
+                  ? 'IN PROGRESS'
+                  : project.status.replace('_', ' ')}
               </Badge>
               <div className="flex items-center gap-1.5 px-3 py-1 rounded-full bg-gray-100 text-xs font-bold text-gray-700 uppercase tracking-wide border border-gray-200">
                 {project.type === 'house' ? <Home className="h-3.5 w-3.5 text-purple-600" /> : <Layout className="h-3.5 w-3.5 text-blue-600" />}
