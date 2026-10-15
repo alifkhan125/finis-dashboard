@@ -14,6 +14,7 @@ import {
   Layers3,
   ListFilter,
   Mail,
+  Pencil,
   Plus,
   Search,
   Sparkles,
@@ -61,6 +62,7 @@ import {
   useGetQuoteWorkCategoriesQuery,
   useGetQuoteWorkItemsQuery,
   useSendQuoteEstimateMutation,
+  useUpdateQuoteEstimateMutation,
   useUpdateQuoteMutation,
   useUpdateQuoteWorkCategoryMutation,
   useUpdateQuoteMeasurementTypeMutation,
@@ -101,6 +103,14 @@ interface BuilderItem {
   unitPrice: string;
   categoryName: string;
   workItemId?: string;
+  scopeChecklist: string[];
+  locationMode: 'all' | 'selected';
+  selectedFloorNumbers: number[];
+  selectedUnitNames: string[];
+  plannedLocationKeys: string[];
+  description: string;
+  estimatedHours: string;
+  allowSubtasks: boolean;
 }
 
 interface QuoteDraft {
@@ -123,6 +133,14 @@ interface BuilderItemDraft {
   unit: string;
   unitPrice: string;
   categoryName: string;
+  scopeChecklistText: string;
+  locationMode: 'all' | 'selected';
+  selectedFloorNumbersText: string;
+  selectedUnitNamesText: string;
+  plannedLocationKeysText: string;
+  description: string;
+  estimatedHours: string;
+  allowSubtasks: boolean;
 }
 
 const EMPTY_BUILDER_INFO: BuilderInfo = {
@@ -153,6 +171,14 @@ const EMPTY_BUILDER_ITEM_DRAFT: BuilderItemDraft = {
   unit: '',
   unitPrice: '',
   categoryName: 'Custom Items',
+  scopeChecklistText: '',
+  locationMode: 'all',
+  selectedFloorNumbersText: '',
+  selectedUnitNamesText: '',
+  plannedLocationKeysText: '',
+  description: '',
+  estimatedHours: '',
+  allowSubtasks: false,
 };
 
 interface CategoryDraft {
@@ -236,8 +262,8 @@ function formatMoney(value?: number | null) {
   return `$${value.toFixed(2)}`;
 }
 
-function FieldLabel({ children }: { children: ReactNode }) {
-  return <label className="text-xs font-black uppercase tracking-widest text-gray-400">{children}</label>;
+function FieldLabel({ children, className = '' }: { children: ReactNode; className?: string }) {
+  return <label className={`block whitespace-nowrap text-xs font-black uppercase tracking-widest text-gray-400 ${className}`}>{children}</label>;
 }
 
 function QuoteFormModal({
@@ -263,8 +289,10 @@ export function QuoteLibraryPage() {
   const [builderStep, setBuilderStep] = useState<BuilderStep>(1);
   const [builderInfo, setBuilderInfo] = useState<BuilderInfo>(EMPTY_BUILDER_INFO);
   const [builderItems, setBuilderItems] = useState<BuilderItem[]>([]);
+  const [draftQuoteId, setDraftQuoteId] = useState<string | null>(null);
   const [builderItemDraft, setBuilderItemDraft] = useState<BuilderItemDraft>(EMPTY_BUILDER_ITEM_DRAFT);
   const [builderItemModalOpen, setBuilderItemModalOpen] = useState(false);
+  const [editingBuilderItemId, setEditingBuilderItemId] = useState<string | null>(null);
   const [includeInactive, setIncludeInactive] = useState(false);
   const [categorySearch, setCategorySearch] = useState('');
   const [measurementSearch, setMeasurementSearch] = useState('');
@@ -307,6 +335,7 @@ export function QuoteLibraryPage() {
 
   const [createQuote, { isLoading: isCreatingQuote }] = useCreateQuoteMutation();
   const [createQuoteEstimate, { isLoading: isCreatingQuoteEstimate }] = useCreateQuoteEstimateMutation();
+  const [updateQuoteEstimate] = useUpdateQuoteEstimateMutation();
   const [deleteQuoteEstimate] = useDeleteQuoteEstimateMutation();
   const [sendQuoteEstimate] = useSendQuoteEstimateMutation();
   const [acceptAndCreateQuoteEstimateProject] = useAcceptAndCreateQuoteEstimateProjectMutation();
@@ -407,65 +436,137 @@ export function QuoteLibraryPage() {
   };
 
   const openBuilderItemModal = () => {
+    setEditingBuilderItemId(null);
     setBuilderItemDraft(EMPTY_BUILDER_ITEM_DRAFT);
     setBuilderItemModalOpen(true);
   };
 
-  const handleAddBuilderItem = () => {
+  const openEditBuilderItem = (item: BuilderItem) => {
+    setEditingBuilderItemId(item.id);
+    setBuilderItemDraft({
+      ...EMPTY_BUILDER_ITEM_DRAFT,
+      workItemId: item.workItemId || '',
+      title: item.title,
+      description: item.description || '',
+      quantity: item.quantity || '1',
+      unit: item.unit || 'each',
+      unitPrice: item.unitPrice || '0',
+      categoryName: item.categoryName || 'Custom Items',
+      scopeChecklistText: item.scopeChecklist.join('\n'),
+      locationMode: item.locationMode,
+      selectedFloorNumbersText: item.selectedFloorNumbers.join(', '),
+      selectedUnitNamesText: item.selectedUnitNames.join(', '),
+      plannedLocationKeysText: item.plannedLocationKeys.join(', '),
+      estimatedHours: item.estimatedHours || '',
+      allowSubtasks: item.allowSubtasks,
+    });
+    setBuilderItemModalOpen(true);
+  };
+
+  const handleAddBuilderItem = async () => {
     if (!builderItemDraft.title.trim()) return;
+    const selectedLocationCount = builderItemDraft.plannedLocationKeysText
+      .split(',')
+      .map((value) => value.trim())
+      .filter(Boolean).length || Number(builderItemDraft.quantity || 1);
     const item: BuilderItem = {
       id: builderItemDraft.workItemId || `custom-${Date.now()}`,
       workItemId: builderItemDraft.workItemId || undefined,
       title: builderItemDraft.title.trim(),
-      quantity: builderItemDraft.quantity || '1',
+      quantity: String(selectedLocationCount || 1),
       unit: builderItemDraft.unit.trim() || 'each',
       unitPrice: builderItemDraft.unitPrice || '0',
       categoryName: builderItemDraft.categoryName || 'Custom Items',
+      scopeChecklist: builderItemDraft.scopeChecklistText.split('\n').map((value) => value.trim()).filter(Boolean),
+      locationMode: builderItemDraft.locationMode,
+      selectedFloorNumbers: builderItemDraft.selectedFloorNumbersText.split(',').map((value) => Number(value.trim())).filter((value) => Number.isFinite(value)),
+      selectedUnitNames: builderItemDraft.selectedUnitNamesText.split(',').map((value) => value.trim()).filter(Boolean),
+      plannedLocationKeys: builderItemDraft.plannedLocationKeysText.split(',').map((value) => value.trim()).filter(Boolean),
+      description: builderItemDraft.description.trim(),
+      estimatedHours: builderItemDraft.estimatedHours,
+      allowSubtasks: builderItemDraft.allowSubtasks,
     };
-    setBuilderItems((current) => [...current, item]);
+    const nextItems = editingBuilderItemId
+      ? builderItems.map((entry) => (entry.id === editingBuilderItemId ? { ...item, id: editingBuilderItemId } : entry))
+      : [...builderItems, item];
+    setBuilderItems(nextItems);
+    // Close immediately after the service is added; draft persistence continues
+    // in the background when a quote draft already exists.
     setBuilderItemDraft(EMPTY_BUILDER_ITEM_DRAFT);
     setBuilderItemModalOpen(false);
+    setEditingBuilderItemId(null);
+    if (draftQuoteId) {
+      await updateQuoteEstimate({
+        id: draftQuoteId,
+        data: { tasks: nextItems.map((entry, index) => ({
+          title: entry.title,
+          quantity: Number(entry.quantity || 1),
+          unit: entry.unit,
+          unitPrice: Number(entry.unitPrice || 0),
+          sortOrder: index,
+          scopeChecklist: entry.scopeChecklist,
+          locationMode: entry.locationMode,
+          selectedFloorNumbers: entry.selectedFloorNumbers,
+          selectedUnitNames: entry.selectedUnitNames,
+          plannedLocationKeys: entry.plannedLocationKeys,
+          description: entry.description,
+          estimatedHours: entry.estimatedHours ? Number(entry.estimatedHours) : undefined,
+        })) },
+      }).unwrap();
+    }
+  };
+
+  const getBuilderPayload = (includeTasks = true) => ({
+    companyId: builderInfo.companyId,
+    projectName: builderInfo.projectName.trim(),
+    clientName: builderInfo.clientName.trim(),
+    clientEmail: builderInfo.email.trim() || undefined,
+    clientPhone: builderInfo.phoneNumber.trim() || undefined,
+    projectAddress: builderInfo.projectAddress.trim(),
+    projectType: builderInfo.projectType,
+    propertyType: builderInfo.propertyType,
+    unitType: builderInfo.unitType,
+    startDate: builderInfo.startDate || undefined,
+    endDate: builderInfo.endDate || undefined,
+    floorStart: builderInfo.floorStart ? Number(builderInfo.floorStart) : undefined,
+    floorEnd: builderInfo.floorEnd ? Number(builderInfo.floorEnd) : undefined,
+    unitStart: builderInfo.unitStart ? Number(builderInfo.unitStart) : undefined,
+    unitEnd: builderInfo.unitEnd ? Number(builderInfo.unitEnd) : undefined,
+    tasks: includeTasks ? builderItems.map((item, index) => ({
+      title: item.title,
+      quantity: Number(item.quantity || 1),
+      unit: item.unit,
+      unitPrice: Number(item.unitPrice || 0),
+      sortOrder: index,
+      scopeChecklist: item.scopeChecklist,
+      locationMode: item.locationMode,
+      selectedFloorNumbers: item.selectedFloorNumbers,
+      selectedUnitNames: item.selectedUnitNames,
+      plannedLocationKeys: item.plannedLocationKeys,
+      description: item.description,
+      estimatedHours: item.estimatedHours ? Number(item.estimatedHours) : undefined,
+    })) : [],
+  });
+
+  const handleBuilderStepOneNext = async () => {
+    if (!builderInfo.companyId || !builderInfo.projectName.trim() || !builderInfo.clientName.trim() || !builderInfo.projectAddress.trim()) return;
+    const created = await createQuoteEstimate(getBuilderPayload(false)).unwrap();
+    setDraftQuoteId(created.quote.id);
+    setBuilderStep(2);
   };
 
   const handleGenerateBuilderQuote = async () => {
     if (!builderInfo.companyId || !builderInfo.projectName.trim() || !builderInfo.clientName.trim() || !builderInfo.projectAddress.trim() || builderItems.length === 0) return;
 
-    await createQuoteEstimate({
-      companyId: builderInfo.companyId,
-      projectName: builderInfo.projectName.trim(),
-      clientName: builderInfo.clientName.trim(),
-      clientEmail: builderInfo.email.trim() || undefined,
-      clientPhone: builderInfo.phoneNumber.trim() || undefined,
-      projectAddress: builderInfo.projectAddress.trim(),
-      projectType: builderInfo.projectType,
-      propertyType: builderInfo.propertyType,
-      unitType: builderInfo.unitType,
-      startDate: builderInfo.startDate || undefined,
-      endDate: builderInfo.endDate || undefined,
-      floorsCount: builderInfo.floorStart && builderInfo.floorEnd
-        ? Number(builderInfo.floorEnd) - Number(builderInfo.floorStart) + 1
-        : builderInfo.floorsCount ? Number(builderInfo.floorsCount) : undefined,
-      unitsPerFloor: builderInfo.unitStart && builderInfo.unitEnd
-        ? Number(builderInfo.unitEnd) - Number(builderInfo.unitStart) + 1
-        : builderInfo.unitsPerFloor ? Number(builderInfo.unitsPerFloor) : undefined,
-      floorStart: builderInfo.floorStart ? Number(builderInfo.floorStart) : undefined,
-      floorEnd: builderInfo.floorEnd ? Number(builderInfo.floorEnd) : undefined,
-      unitStart: builderInfo.unitStart ? Number(builderInfo.unitStart) : undefined,
-      unitEnd: builderInfo.unitEnd ? Number(builderInfo.unitEnd) : undefined,
-      tasks: builderItems.map((item, index) => ({
-        title: item.title,
-        quantity: Number(item.quantity || 1),
-        unit: item.unit,
-        unitPrice: Number(item.unitPrice || 0),
-        estimatedHours: builderInfo.estimatedTime ? Number(builderInfo.estimatedTime) || undefined : undefined,
-        sortOrder: index,
-      })),
-    }).unwrap();
+    const payload = getBuilderPayload(true);
+    if (draftQuoteId) await updateQuoteEstimate({ id: draftQuoteId, data: payload }).unwrap();
+    else await createQuoteEstimate(payload).unwrap();
 
     setActiveTab('quotes');
     setBuilderStep(1);
     setBuilderInfo(EMPTY_BUILDER_INFO);
     setBuilderItems([]);
+    setDraftQuoteId(null);
   };
 
   const openCreateQuote = () => {
@@ -1024,6 +1125,16 @@ export function QuoteLibraryPage() {
     );
   }
 
+  const plannedFloorNumbers = builderInfo.floorStart && builderInfo.floorEnd
+    ? Array.from({ length: Math.max(0, Number(builderInfo.floorEnd) - Number(builderInfo.floorStart) + 1) }, (_, index) => Number(builderInfo.floorStart) + index)
+    : [];
+  const getPlannedUnitNames = (floor: number) => {
+    if (!builderInfo.unitStart || !builderInfo.unitEnd) return [];
+    const count = Math.max(0, Number(builderInfo.unitEnd) - Number(builderInfo.unitStart) + 1);
+    const floorOffset = floor - Number(builderInfo.floorStart || plannedFloorNumbers[0] || 1);
+    return Array.from({ length: count }, (_, index) => String(Number(builderInfo.unitStart) + floorOffset * 100 + index));
+  };
+
   return (
     <div className="space-y-6 pb-12">
       <SEO title="Quote Library" description="Manage quotation work categories, work items, and selector options." />
@@ -1146,10 +1257,7 @@ export function QuoteLibraryPage() {
                     <FieldLabel>Email</FieldLabel>
                     <Input value={builderInfo.email} onChange={(e) => setBuilderField('email', e.target.value)} placeholder="Enter email address" />
                   </div>
-                  <div className="space-y-2">
-                    <FieldLabel>Estimated Hours</FieldLabel>
-                    <Input type="number" min="0" step="0.25" value={builderInfo.estimatedTime} onChange={(e) => setBuilderField('estimatedTime', e.target.value)} placeholder="Enter estimated hours" />
-                  </div>
+      
                 </CardContent>
               </Card>
 
@@ -1198,27 +1306,27 @@ export function QuoteLibraryPage() {
                       <Input type="date" value={builderInfo.endDate} onChange={(e) => setBuilderField('endDate', e.target.value)} />
                     </div>
                   </div>
-                  <div className="grid gap-4 md:grid-cols-4">
+                  <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
                     <div className="space-y-2">
-                      <FieldLabel>Floor Start</FieldLabel>
+                      <FieldLabel className="whitespace-nowrap">Floor Start</FieldLabel>
                       <Input type="number" min="1" value={builderInfo.floorStart} onChange={(e) => setBuilderField('floorStart', e.target.value)} placeholder="e.g. 1" />
                     </div>
                     <div className="space-y-2">
-                      <FieldLabel>Floor End</FieldLabel>
+                      <FieldLabel className="whitespace-nowrap">Floor End</FieldLabel>
                       <Input type="number" min="1" value={builderInfo.floorEnd} onChange={(e) => setBuilderField('floorEnd', e.target.value)} placeholder="e.g. 4" />
                     </div>
                     <div className="space-y-2">
-                      <FieldLabel>Unit Start</FieldLabel>
+                      <FieldLabel className="whitespace-nowrap">Unit Start</FieldLabel>
                       <Input type="number" min="1" value={builderInfo.unitStart} onChange={(e) => setBuilderField('unitStart', e.target.value)} placeholder="e.g. 101" />
                     </div>
                     <div className="space-y-2">
-                      <FieldLabel>Unit End</FieldLabel>
+                      <FieldLabel className="whitespace-nowrap">Unit End</FieldLabel>
                       <Input type="number" min="1" value={builderInfo.unitEnd} onChange={(e) => setBuilderField('unitEnd', e.target.value)} placeholder="e.g. 103" />
                     </div>
                   </div>
                   <Button
                     className="w-full"
-                    onClick={() => setBuilderStep(2)}
+                    onClick={handleBuilderStepOneNext}
                     disabled={!builderInfo.companyId || !builderInfo.projectName.trim() || !builderInfo.clientName.trim() || !builderInfo.projectAddress.trim()}
                   >
                     Next
@@ -1270,7 +1378,16 @@ export function QuoteLibraryPage() {
                                 <Button
                                   variant="outline"
                                   size="sm"
+                                  onClick={() => openEditBuilderItem(item)}
+                                  title="Edit service"
+                                >
+                                  <Pencil className="h-4 w-4" />
+                                </Button>
+                                <Button
+                                  variant="outline"
+                                  size="sm"
                                   onClick={() => setBuilderItems((current) => current.filter((currentItem) => currentItem.id !== item.id))}
+                                  title="Remove service"
                                 >
                                   <Trash2 className="h-4 w-4" />
                                 </Button>
@@ -1740,76 +1857,110 @@ export function QuoteLibraryPage() {
       <QuoteFormModal
         open={builderItemModalOpen}
         onClose={() => setBuilderItemModalOpen(false)}
-        title="Add Service"
+        title={editingBuilderItemId ? 'Edit Service' : 'Add Service'}
       >
         <form className="space-y-5" onSubmit={(event) => { event.preventDefault(); handleAddBuilderItem(); }}>
           <div className="space-y-2">
-            <label className="text-xs font-black uppercase tracking-widest text-gray-400">Library Task / Material</label>
-            <Select
-              value={builderItemDraft.workItemId}
-              onChange={(e) => applyBuilderWorkItem(e.target.value)}
-              placeholder="Select saved task/material or create custom"
-              options={[
-                { value: '', label: 'Custom Task / Material' },
-                ...items.map((item) => ({
-                  value: item.id,
-                  label: `${item.name} - ${formatMoney(item.unitCost ?? null)}`,
-                })),
-              ]}
-            />
-          </div>
-          <div className="space-y-2">
-            <label className="text-xs font-black uppercase tracking-widest text-gray-400">Task / Material Name</label>
+            <label className="text-xs font-black uppercase tracking-widest text-gray-400">Task Title</label>
             <Input
               value={builderItemDraft.title}
               onChange={(e) => setBuilderItemDraft((draft) => ({ ...draft, title: e.target.value }))}
-              placeholder="e.g. Drywall install, paint labor, cement, tiles"
+              placeholder="e.g. Install Kitchen Cabinets"
               autoFocus
             />
           </div>
-          <div className="grid gap-4 md:grid-cols-3">
+          <div className="space-y-2">
+            <label className="text-xs font-black uppercase tracking-widest text-gray-400">Description</label>
+            <Textarea
+              value={builderItemDraft.description}
+              onChange={(e) => setBuilderItemDraft((draft) => ({ ...draft, description: e.target.value }))}
+              placeholder="Task details..."
+              rows={2}
+            />
+          </div>
+          <div className="grid gap-4 md:grid-cols-2">
             <div className="space-y-2">
-              <label className="text-xs font-black uppercase tracking-widest text-gray-400">Quantity</label>
-              <Input
-                type="number"
-                step="0.01"
-                min="0"
-                value={builderItemDraft.quantity}
-                onChange={(e) => setBuilderItemDraft((draft) => ({ ...draft, quantity: e.target.value }))}
-              />
+              <label className="text-xs font-black uppercase tracking-widest text-gray-400">Hours / Unit</label>
+              <Input type="number" min="0" step="0.5" value={builderItemDraft.estimatedHours} onChange={(e) => setBuilderItemDraft((draft) => ({ ...draft, estimatedHours: e.target.value }))} placeholder="e.g. 4" />
             </div>
             <div className="space-y-2">
-              <label className="text-xs font-black uppercase tracking-widest text-gray-400">Unit</label>
-              <Input
-                value={builderItemDraft.unit}
-                onChange={(e) => setBuilderItemDraft((draft) => ({ ...draft, unit: e.target.value }))}
-                placeholder="hour / room / sqft / bag / piece"
-              />
-            </div>
-            <div className="space-y-2">
-              <label className="text-xs font-black uppercase tracking-widest text-gray-400">Unit Price</label>
-              <Input
-                type="number"
-                step="0.01"
-                min="0"
-                value={builderItemDraft.unitPrice}
-                onChange={(e) => setBuilderItemDraft((draft) => ({ ...draft, unitPrice: e.target.value }))}
-                placeholder="0.00"
-              />
+              <label className="text-xs font-black uppercase tracking-widest text-gray-400">Internal Price</label>
+              <Input type="number" min="0" step="0.01" value={builderItemDraft.unitPrice} onChange={(e) => setBuilderItemDraft((draft) => ({ ...draft, unitPrice: e.target.value }))} placeholder="e.g. 150" />
             </div>
           </div>
-          <div className="rounded-2xl border border-gray-100 bg-gray-50 px-4 py-3">
-            <p className="text-xs font-black uppercase tracking-widest text-gray-400">Subtotal</p>
-            <p className="mt-1 text-xl font-black text-gray-900">
-              {formatMoney(Number(builderItemDraft.quantity || 0) * Number(builderItemDraft.unitPrice || 0))}
+          <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3">
+            <div className="flex items-center justify-between text-xs font-black uppercase tracking-widest text-gray-400">
+              <span>Subtotal</span>
+              <span className="text-base font-black text-gray-900">
+                ${(Number(builderItemDraft.unitPrice || 0) * (builderItemDraft.plannedLocationKeysText.split(',').map((value) => value.trim()).filter(Boolean).length || Number(builderItemDraft.quantity || 1))).toFixed(2)}
+              </span>
+            </div>
+            <p className="mt-1 text-xs text-gray-500">
+              Per selected floor/unit: ${Number(builderItemDraft.unitPrice || 0).toFixed(2)} x {builderItemDraft.plannedLocationKeysText.split(',').map((value) => value.trim()).filter(Boolean).length || Number(builderItemDraft.quantity || 1)}
             </p>
+          </div>
+          <label className="flex items-center gap-2 text-sm text-gray-600">
+            <input type="checkbox" checked={builderItemDraft.allowSubtasks} onChange={(e) => setBuilderItemDraft((draft) => ({ ...draft, allowSubtasks: e.target.checked }))} />
+            Allow Subtasks
+          </label>
+          <div className="space-y-3 rounded-xl border border-gray-100 bg-gray-50 p-4">
+            <div className="flex items-center justify-between">
+              <label className="text-xs font-black uppercase tracking-widest text-gray-400">Floors / Sections</label>
+              <button type="button" className="text-xs font-bold text-blue-600" onClick={() => setBuilderItemDraft((draft) => {
+                const allKeys = plannedFloorNumbers.flatMap((floor) => getPlannedUnitNames(floor).map((unit) => `floor_${floor}_unit_${unit}`));
+                const selectedKeys = draft.plannedLocationKeysText.split(',').map((key) => key.trim()).filter(Boolean);
+                const allSelected = plannedFloorNumbers.every((floor) => draft.selectedFloorNumbersText.split(',').map((value) => Number(value.trim())).includes(floor)) && allKeys.every((key) => selectedKeys.includes(key));
+                return allSelected
+                  ? { ...draft, locationMode: 'selected', selectedFloorNumbersText: '', plannedLocationKeysText: '' }
+                  : { ...draft, locationMode: 'selected', selectedFloorNumbersText: plannedFloorNumbers.join(', '), plannedLocationKeysText: allKeys.join(', ') };
+              })}>{plannedFloorNumbers.length > 0 && plannedFloorNumbers.every((floor) => builderItemDraft.selectedFloorNumbersText.split(',').map((value) => Number(value.trim())).includes(floor)) && plannedFloorNumbers.flatMap((floor) => getPlannedUnitNames(floor).map((unit) => `floor_${floor}_unit_${unit}`)).every((key) => builderItemDraft.plannedLocationKeysText.split(',').map((value) => value.trim()).includes(key)) ? 'Deselect All' : 'Select All'}</button>
+            </div>
+            <div className="flex flex-wrap gap-2">
+              {plannedFloorNumbers.map((floor) => {
+                const selected = builderItemDraft.selectedFloorNumbersText.split(',').map((value) => Number(value.trim())).includes(floor);
+                return <button key={floor} type="button" className={cn('rounded-full border px-3 py-1 text-xs font-semibold', selected ? 'border-blue-300 bg-blue-50 text-blue-700' : 'border-gray-200 bg-white text-gray-600')} onClick={() => setBuilderItemDraft((draft) => {
+                  const nextFloors = draft.selectedFloorNumbersText.split(',').map((value) => Number(value.trim())).filter(Boolean);
+                  const nextKeys = draft.plannedLocationKeysText.split(',').map((value) => value.trim()).filter(Boolean);
+                  const floorKeys = getPlannedUnitNames(floor).map((unit) => `floor_${floor}_unit_${unit}`);
+                  return selected
+                    ? { ...draft, locationMode: 'selected', selectedFloorNumbersText: nextFloors.filter((value) => value !== floor).join(', '), plannedLocationKeysText: nextKeys.filter((key) => !floorKeys.includes(key)).join(', ') }
+                    : { ...draft, locationMode: 'selected', selectedFloorNumbersText: [...nextFloors, floor].join(', '), plannedLocationKeysText: [...new Set([...nextKeys, ...floorKeys])].join(', ') };
+                })}>Floor {floor}</button>;
+              })}
+            </div>
+            {builderItemDraft.selectedFloorNumbersText.split(',').map((value) => Number(value.trim())).filter(Boolean).map((floor) => (
+              <div key={floor} className="space-y-2 border-t border-gray-200 pt-3">
+                <div className="flex items-center justify-between">
+                  <label className="text-xs font-black uppercase tracking-widest text-gray-400">Floor {floor} Units / Rooms</label>
+                  <button type="button" className="text-xs font-bold text-blue-600" onClick={() => setBuilderItemDraft((draft) => {
+                    const floorKeys = getPlannedUnitNames(floor).map((unit) => `floor_${floor}_unit_${unit}`);
+                    const selectedKeys = draft.plannedLocationKeysText.split(',').map((key) => key.trim()).filter(Boolean);
+                    const allSelected = floorKeys.every((key) => selectedKeys.includes(key));
+                    return {
+                      ...draft,
+                      locationMode: 'selected',
+                      plannedLocationKeysText: allSelected
+                        ? selectedKeys.filter((key) => !floorKeys.includes(key)).join(', ')
+                        : [...new Set([...selectedKeys, ...floorKeys])].join(', '),
+                    };
+                  })}>{getPlannedUnitNames(floor).length > 0 && getPlannedUnitNames(floor).every((unit) => builderItemDraft.plannedLocationKeysText.split(',').map((key) => key.trim()).includes(`floor_${floor}_unit_${unit}`)) ? 'Deselect All' : 'Select All'}</button>
+                </div>
+                <div className="flex flex-wrap gap-2">
+                  {getPlannedUnitNames(floor).map((unit) => {
+                    const key = `floor_${floor}_unit_${unit}`;
+                    const selected = builderItemDraft.plannedLocationKeysText.split(',').map((value) => value.trim()).includes(key);
+                    return <button key={key} type="button" className={cn('rounded-full border px-3 py-1 text-xs font-semibold', selected ? 'border-blue-300 bg-blue-50 text-blue-700' : 'border-gray-200 bg-white text-gray-600')} onClick={() => setBuilderItemDraft((draft) => ({ ...draft, locationMode: 'selected', plannedLocationKeysText: selected ? draft.plannedLocationKeysText.split(',').map((value) => value.trim()).filter((value) => value !== key).join(', ') : [...draft.plannedLocationKeysText.split(',').map((value) => value.trim()).filter(Boolean), key].join(', ') }))}>{unit}</button>;
+                  })}
+                </div>
+              </div>
+            ))}
           </div>
           <div className="flex justify-end gap-3">
             <Button variant="outline" type="button" onClick={() => setBuilderItemModalOpen(false)}>
               Cancel
             </Button>
             <Button type="submit" disabled={!builderItemDraft.title.trim()}>
-              Add Service
+              {editingBuilderItemId ? 'Save Changes' : 'Add Service'}
             </Button>
           </div>
         </form>

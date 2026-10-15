@@ -111,7 +111,14 @@ export function ProjectDetailPage() {
 
   // Derive counts from real data
   const teamCount = project.counts?.teamMembers ?? project.team?.length ?? 0;
-  const taskCount = structureSummary.subTasks || project.counts?.tasks || project.tasks?.length || 0;
+  // Count each main task once when it has no subtasks; otherwise count its
+  // actual subtasks. A task mapped to multiple floors/units is still one task.
+  const taskCount = (project.tasks?.length ?? 0) > 0
+    ? project.tasks.reduce(
+        (total: number, task: any) => total + (Number(task.subTaskCount ?? task.subtasks?.length ?? 0) || 1),
+        0,
+      )
+    : project.counts?.tasks || structureSummary.subTasks || 0;
   const floorCount = project.counts?.floors ?? project.floors?.length ?? 0;
 
   const tabs: { id: string, label: string, count?: number }[] = [

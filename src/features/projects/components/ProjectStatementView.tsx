@@ -104,6 +104,7 @@ interface StatementData {
     price: number;
     unitName: string | null;
     floorName: string | null;
+    locationLabel?: string;
     workerName: string | null;
     completedAt: string | null;
     isInvoiced: boolean;
@@ -578,7 +579,7 @@ export function ProjectStatementView({ projectId }: ProjectStatementViewProps) {
                             <div className="text-[11px] text-gray-500">{item.taskTitle}</div>
                           </td>
                           <td className="px-6 py-3.5 text-gray-600">
-                            {[item.floorName, item.unitName].filter(Boolean).join(' / ') || 'General'}
+                            {item.locationLabel || [item.floorName, item.unitName].filter(Boolean).join(' / ') || 'General'}
                           </td>
                           <td className="px-6 py-3.5 text-gray-600">{item.workerName || 'Unassigned'}</td>
                           <td className="px-6 py-3.5">

@@ -123,6 +123,11 @@ export interface QuoteEstimateTask {
   plannedFloorLabel?: string | null;
   plannedUnitLabel?: string | null;
   plannedLocationKey?: string | null;
+  locationMode?: 'all' | 'selected' | null;
+  selectedFloorNumbers?: number[] | null;
+  selectedUnitNames?: string[] | null;
+  plannedLocationKeys?: string[] | null;
+  scopeChecklist?: string[] | null;
   quantity: number;
   unit?: string | null;
   estimatedHours?: number | null;
@@ -193,6 +198,11 @@ export interface CreateQuoteEstimateTaskPayload {
   plannedFloorLabel?: string;
   plannedUnitLabel?: string;
   plannedLocationKey?: string;
+  locationMode?: 'all' | 'selected';
+  selectedFloorNumbers?: number[];
+  selectedUnitNames?: string[];
+  plannedLocationKeys?: string[];
+  scopeChecklist?: string[];
   sortOrder?: number;
 }
 
