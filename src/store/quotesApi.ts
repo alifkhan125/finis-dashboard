@@ -120,6 +120,9 @@ export interface QuoteEstimateTask {
   description?: string | null;
   floorNumber?: number | null;
   unitName?: string | null;
+  plannedFloorLabel?: string | null;
+  plannedUnitLabel?: string | null;
+  plannedLocationKey?: string | null;
   quantity: number;
   unit?: string | null;
   estimatedHours?: number | null;
@@ -146,6 +149,10 @@ export interface QuoteEstimate {
   endDate?: string | null;
   floorsCount?: number | null;
   unitsPerFloor?: number | null;
+  floorStart?: number | null;
+  floorEnd?: number | null;
+  unitStart?: number | null;
+  unitEnd?: number | null;
   totalUnits?: number | null;
   subtotal: number;
   discountAmount: number;
@@ -183,6 +190,9 @@ export interface CreateQuoteEstimateTaskPayload {
   unit?: string;
   estimatedHours?: number;
   unitPrice?: number;
+  plannedFloorLabel?: string;
+  plannedUnitLabel?: string;
+  plannedLocationKey?: string;
   sortOrder?: number;
 }
 
@@ -200,6 +210,10 @@ export interface CreateQuoteEstimatePayload {
   endDate?: string;
   floorsCount?: number;
   unitsPerFloor?: number;
+  floorStart?: number;
+  floorEnd?: number;
+  unitStart?: number;
+  unitEnd?: number;
   discountAmount?: number;
   taxAmount?: number;
   tasks?: CreateQuoteEstimateTaskPayload[];

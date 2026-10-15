@@ -84,6 +84,10 @@ interface BuilderInfo {
   endDate: string;
   floorsCount: string;
   unitsPerFloor: string;
+  floorStart: string;
+  floorEnd: string;
+  unitStart: string;
+  unitEnd: string;
   projectType: string;
   propertyType: string;
   unitType: string;
@@ -133,6 +137,10 @@ const EMPTY_BUILDER_INFO: BuilderInfo = {
   endDate: '',
   floorsCount: '',
   unitsPerFloor: '',
+  floorStart: '1',
+  floorEnd: '',
+  unitStart: '101',
+  unitEnd: '',
   projectType: 'new_build',
   propertyType: 'residential',
   unitType: 'apartment',
@@ -434,8 +442,16 @@ export function QuoteLibraryPage() {
       unitType: builderInfo.unitType,
       startDate: builderInfo.startDate || undefined,
       endDate: builderInfo.endDate || undefined,
-      floorsCount: builderInfo.floorsCount ? Number(builderInfo.floorsCount) : undefined,
-      unitsPerFloor: builderInfo.unitsPerFloor ? Number(builderInfo.unitsPerFloor) : undefined,
+      floorsCount: builderInfo.floorStart && builderInfo.floorEnd
+        ? Number(builderInfo.floorEnd) - Number(builderInfo.floorStart) + 1
+        : builderInfo.floorsCount ? Number(builderInfo.floorsCount) : undefined,
+      unitsPerFloor: builderInfo.unitStart && builderInfo.unitEnd
+        ? Number(builderInfo.unitEnd) - Number(builderInfo.unitStart) + 1
+        : builderInfo.unitsPerFloor ? Number(builderInfo.unitsPerFloor) : undefined,
+      floorStart: builderInfo.floorStart ? Number(builderInfo.floorStart) : undefined,
+      floorEnd: builderInfo.floorEnd ? Number(builderInfo.floorEnd) : undefined,
+      unitStart: builderInfo.unitStart ? Number(builderInfo.unitStart) : undefined,
+      unitEnd: builderInfo.unitEnd ? Number(builderInfo.unitEnd) : undefined,
       tasks: builderItems.map((item, index) => ({
         title: item.title,
         quantity: Number(item.quantity || 1),
@@ -1182,14 +1198,22 @@ export function QuoteLibraryPage() {
                       <Input type="date" value={builderInfo.endDate} onChange={(e) => setBuilderField('endDate', e.target.value)} />
                     </div>
                   </div>
-                  <div className="grid gap-4 md:grid-cols-2">
+                  <div className="grid gap-4 md:grid-cols-4">
                     <div className="space-y-2">
-                      <FieldLabel>Floors Count</FieldLabel>
-                      <Input type="number" min="0" value={builderInfo.floorsCount} onChange={(e) => setBuilderField('floorsCount', e.target.value)} placeholder="Enter floors count" />
+                      <FieldLabel>Floor Start</FieldLabel>
+                      <Input type="number" min="1" value={builderInfo.floorStart} onChange={(e) => setBuilderField('floorStart', e.target.value)} placeholder="e.g. 1" />
                     </div>
                     <div className="space-y-2">
-                      <FieldLabel>Units Per Floor</FieldLabel>
-                      <Input type="number" min="0" value={builderInfo.unitsPerFloor} onChange={(e) => setBuilderField('unitsPerFloor', e.target.value)} placeholder="Enter units per floor" />
+                      <FieldLabel>Floor End</FieldLabel>
+                      <Input type="number" min="1" value={builderInfo.floorEnd} onChange={(e) => setBuilderField('floorEnd', e.target.value)} placeholder="e.g. 4" />
+                    </div>
+                    <div className="space-y-2">
+                      <FieldLabel>Unit Start</FieldLabel>
+                      <Input type="number" min="1" value={builderInfo.unitStart} onChange={(e) => setBuilderField('unitStart', e.target.value)} placeholder="e.g. 101" />
+                    </div>
+                    <div className="space-y-2">
+                      <FieldLabel>Unit End</FieldLabel>
+                      <Input type="number" min="1" value={builderInfo.unitEnd} onChange={(e) => setBuilderField('unitEnd', e.target.value)} placeholder="e.g. 103" />
                     </div>
                   </div>
                   <Button
@@ -1323,7 +1347,7 @@ export function QuoteLibraryPage() {
                   <div className="rounded-2xl border border-gray-100 bg-gray-50 p-4">
                     <p className="text-xs font-black uppercase tracking-widest text-gray-400">Planning</p>
                     <p className="mt-1 font-black text-gray-900">
-                      {builderInfo.floorsCount || 0} floors • {builderInfo.unitsPerFloor || 0} units/floor
+                      Floors {builderInfo.floorStart || '1'}-{builderInfo.floorEnd || builderInfo.floorStart || '1'} • Units {builderInfo.unitStart || '1'}-{builderInfo.unitEnd || builderInfo.unitStart || '1'}
                     </p>
                   </div>
                 </CardContent>
