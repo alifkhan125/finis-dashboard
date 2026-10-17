@@ -181,6 +181,17 @@ const EMPTY_BUILDER_ITEM_DRAFT: BuilderItemDraft = {
   allowSubtasks: false,
 };
 
+interface TaskTemplateSuggestion {
+  id: string;
+  title: string;
+  description: string;
+  estimatedHours: string;
+  unitPrice: string;
+  source: 'previous_quote' | 'work_item' | 'quote_line';
+  categoryName?: string;
+  badgeLabel?: string;
+}
+
 interface CategoryDraft {
   name: string;
   description: string;
@@ -333,6 +344,21 @@ export function QuoteLibraryPage() {
   const { data: quoteEstimateList, isLoading: quoteEstimatesLoading } = useGetQuoteEstimatesQuery({ limit: 100 });
   const quoteEstimates = quoteEstimateList?.data ?? [];
 
+  const { data: builderTemplateWorkItems = [] } = useGetQuoteWorkItemsQuery({
+    projectType: builderInfo.projectType || undefined,
+    propertyType: builderInfo.propertyType || undefined,
+    unitType: builderInfo.unitType || undefined,
+    includeInactive: false,
+  });
+  const { data: builderTemplateQuoteList } = useGetQuotesQuery({
+    projectType: builderInfo.projectType || undefined,
+    propertyType: builderInfo.propertyType || undefined,
+    unitType: builderInfo.unitType || undefined,
+  });
+  const builderTemplateQuotes = builderTemplateQuoteList?.quotes ?? [];
+
+  const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
+
   const [createQuote, { isLoading: isCreatingQuote }] = useCreateQuoteMutation();
   const [createQuoteEstimate, { isLoading: isCreatingQuoteEstimate }] = useCreateQuoteEstimateMutation();
   const [updateQuoteEstimate] = useUpdateQuoteEstimateMutation();
@@ -435,14 +461,159 @@ export function QuoteLibraryPage() {
     }));
   };
 
+  const taskSuggestions = useMemo(() => {
+    const norm = (str?: string | null) => (str || '').toLowerCase().replace(/[\s_-]+/g, '');
+    const currentProject = norm(builderInfo.projectType);
+    const currentProperty = norm(builderInfo.propertyType);
+    const currentUnit = norm(builderInfo.unitType);
+
+    const suggestions: TaskTemplateSuggestion[] = [];
+    const titleKeyMap = new Map<string, number>();
+
+    // 1. Process tasks from matching previous quote estimates
+    const matchingEstimates = quoteEstimates.filter((est) => {
+      const matchProject = !currentProject || !est.projectType || norm(est.projectType) === currentProject;
+      const matchProperty = !currentProperty || !est.propertyType || norm(est.propertyType) === currentProperty;
+      const matchUnit = !currentUnit || !est.unitType || norm(est.unitType) === currentUnit;
+      return matchProject && matchProperty && matchUnit;
+    });
+
+    for (const est of matchingEstimates) {
+      for (const task of est.tasks || []) {
+        const cleanTitle = (task.title || '').trim();
+        if (!cleanTitle) continue;
+        const key = cleanTitle.toLowerCase();
+
+        const itemData: TaskTemplateSuggestion = {
+          id: `prev-task-${task.id || Math.random()}`,
+          title: cleanTitle,
+          description: task.description?.trim() || '',
+          estimatedHours: task.estimatedHours != null ? String(task.estimatedHours) : '',
+          unitPrice: task.unitPrice != null ? String(task.unitPrice) : '0',
+          source: 'previous_quote',
+          badgeLabel: 'Saved Task',
+        };
+
+        if (!titleKeyMap.has(key)) {
+          titleKeyMap.set(key, suggestions.length);
+          suggestions.push(itemData);
+        } else {
+          const existingIdx = titleKeyMap.get(key)!;
+          const existing = suggestions[existingIdx];
+          if ((!existing.description && itemData.description) || (!existing.estimatedHours && itemData.estimatedHours)) {
+            suggestions[existingIdx] = {
+              ...existing,
+              description: existing.description || itemData.description,
+              estimatedHours: existing.estimatedHours || itemData.estimatedHours,
+              unitPrice: existing.unitPrice !== '0' ? existing.unitPrice : itemData.unitPrice,
+            };
+          }
+        }
+      }
+    }
+
+    // 2. Process matching quote line items
+    for (const quote of builderTemplateQuotes) {
+      const cleanTitle = (quote.title || '').trim();
+      if (!cleanTitle) continue;
+      const key = cleanTitle.toLowerCase();
+
+      const itemData: TaskTemplateSuggestion = {
+        id: `quote-${quote.id}`,
+        title: cleanTitle,
+        description: quote.notes?.trim() || '',
+        estimatedHours: '',
+        unitPrice: quote.unitPrice != null ? String(quote.unitPrice) : '0',
+        source: 'quote_line',
+        badgeLabel: 'Quote Line',
+      };
+
+      if (!titleKeyMap.has(key)) {
+        titleKeyMap.set(key, suggestions.length);
+        suggestions.push(itemData);
+      } else {
+        const existingIdx = titleKeyMap.get(key)!;
+        const existing = suggestions[existingIdx];
+        if (!existing.description && itemData.description) {
+          suggestions[existingIdx] = {
+            ...existing,
+            description: itemData.description,
+          };
+        }
+      }
+    }
+
+    // 3. Process work items from library matching builder filters
+    for (const item of builderTemplateWorkItems) {
+      const cleanTitle = (item.name || '').trim();
+      if (!cleanTitle) continue;
+      const key = cleanTitle.toLowerCase();
+
+      const itemData: TaskTemplateSuggestion = {
+        id: item.id,
+        title: cleanTitle,
+        description: '',
+        estimatedHours: '',
+        unitPrice: item.unitCost != null ? String(item.unitCost) : '0',
+        source: 'work_item',
+        categoryName: item.category?.name || 'Standard Items',
+        badgeLabel: 'Library Item',
+      };
+
+      if (!titleKeyMap.has(key)) {
+        titleKeyMap.set(key, suggestions.length);
+        suggestions.push(itemData);
+      } else {
+        const existingIdx = titleKeyMap.get(key)!;
+        if (!suggestions[existingIdx].categoryName && itemData.categoryName) {
+          suggestions[existingIdx].categoryName = itemData.categoryName;
+        }
+      }
+    }
+
+    return suggestions.sort((a, b) => a.title.localeCompare(b.title));
+  }, [quoteEstimates, builderTemplateQuotes, builderTemplateWorkItems, builderInfo.projectType, builderInfo.propertyType, builderInfo.unitType]);
+
+  const handleSelectTemplate = (templateId: string) => {
+    setSelectedTemplateId(templateId);
+    if (!templateId) return;
+
+    const suggestion = taskSuggestions.find((s) => s.id === templateId);
+    if (!suggestion) return;
+
+    setBuilderItemDraft((draft) => ({
+      ...draft,
+      workItemId: suggestion.source === 'work_item' ? suggestion.id : '',
+      title: suggestion.title,
+      description: suggestion.description || '',
+      estimatedHours: suggestion.estimatedHours || '',
+      unitPrice: suggestion.unitPrice || '0',
+      categoryName: suggestion.categoryName || draft.categoryName || 'Custom Items',
+    }));
+  };
+
+  const handleClearTemplateSelection = () => {
+    setSelectedTemplateId('');
+    setBuilderItemDraft((draft) => ({
+      ...draft,
+      workItemId: '',
+      title: '',
+      description: '',
+      estimatedHours: '',
+      unitPrice: '',
+    }));
+  };
+
   const openBuilderItemModal = () => {
     setEditingBuilderItemId(null);
+    setSelectedTemplateId('');
     setBuilderItemDraft(EMPTY_BUILDER_ITEM_DRAFT);
     setBuilderItemModalOpen(true);
   };
 
   const openEditBuilderItem = (item: BuilderItem) => {
     setEditingBuilderItemId(item.id);
+    setSelectedTemplateId('');
     setBuilderItemDraft({
       ...EMPTY_BUILDER_ITEM_DRAFT,
       workItemId: item.workItemId || '',
@@ -493,6 +664,7 @@ export function QuoteLibraryPage() {
     // Close immediately after the service is added; draft persistence continues
     // in the background when a quote draft already exists.
     setBuilderItemDraft(EMPTY_BUILDER_ITEM_DRAFT);
+    setSelectedTemplateId('');
     setBuilderItemModalOpen(false);
     setEditingBuilderItemId(null);
     if (draftQuoteId) {
@@ -1860,11 +2032,53 @@ export function QuoteLibraryPage() {
         title={editingBuilderItemId ? 'Edit Service' : 'Add Service'}
       >
         <form className="space-y-5" onSubmit={(event) => { event.preventDefault(); handleAddBuilderItem(); }}>
+          {!editingBuilderItemId && (
+            <div className="space-y-2">
+              <div className="flex items-center justify-between">
+                <label className="text-xs font-black uppercase tracking-widest text-gray-400">
+                  Select Template (Optional)
+                </label>
+                {selectedTemplateId && (
+                  <button
+                    type="button"
+                    onClick={handleClearTemplateSelection}
+                    className="text-xs font-bold text-blue-600 hover:underline"
+                  >
+                    Clear
+                  </button>
+                )}
+              </div>
+              <Select
+                searchable
+                searchPlaceholder="Search saved tasks..."
+                value={selectedTemplateId}
+                onChange={(e) => handleSelectTemplate(e.target.value)}
+                placeholder="-- Select from saved templates (Optional) --"
+                options={[
+                  { value: '', label: '-- Custom Service (Type Manually) --' },
+                  ...taskSuggestions.map((suggestion) => ({
+                    value: suggestion.id,
+                    label: `${suggestion.title}${
+                      Number(suggestion.unitPrice) > 0 || Number(suggestion.estimatedHours) > 0
+                        ? ` (${Number(suggestion.unitPrice) > 0 ? `$${Number(suggestion.unitPrice).toFixed(2)}` : ''}${
+                            Number(suggestion.unitPrice) > 0 && Number(suggestion.estimatedHours) > 0 ? ' • ' : ''
+                          }${Number(suggestion.estimatedHours) > 0 ? `${suggestion.estimatedHours} hrs` : ''})`
+                        : ''
+                    }`,
+                  })),
+                ]}
+              />
+            </div>
+          )}
+
           <div className="space-y-2">
             <label className="text-xs font-black uppercase tracking-widest text-gray-400">Task Title</label>
             <Input
               value={builderItemDraft.title}
-              onChange={(e) => setBuilderItemDraft((draft) => ({ ...draft, title: e.target.value }))}
+              onChange={(e) => {
+                setSelectedTemplateId('');
+                setBuilderItemDraft((draft) => ({ ...draft, title: e.target.value }));
+              }}
               placeholder="e.g. Install Kitchen Cabinets"
               autoFocus
             />

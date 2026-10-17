@@ -114,7 +114,7 @@ export function ProjectDetailPage() {
   // Count each main task once when it has no subtasks; otherwise count its
   // actual subtasks. A task mapped to multiple floors/units is still one task.
   const taskCount = (project.tasks?.length ?? 0) > 0
-    ? project.tasks.reduce(
+    ? (project.tasks ?? []).reduce(
         (total: number, task: any) => total + (Number(task.subTaskCount ?? task.subtasks?.length ?? 0) || 1),
         0,
       )
