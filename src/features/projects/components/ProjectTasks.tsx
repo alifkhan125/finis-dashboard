@@ -33,6 +33,7 @@ export function ProjectTasks() {
     const { data: floors } = useProjectFloors(projectId ?? '');
 
     // Modals State
+    const [saveError, setSaveError] = useState('');
     const [isAddModalOpen, setIsAddModalOpen] = useState(false);
     const [isAssignModalOpen, setIsAssignModalOpen] = useState(false);
     const [isDeleteModalOpen, setIsDeleteModalOpen] = useState(false);
@@ -77,6 +78,11 @@ export function ProjectTasks() {
     const allUnits = floors?.flatMap((f: any) => f.rooms || f.units || []) || [];
     const allFloorIds = floors?.map((f: any) => f.id).filter(Boolean) || [];
     const allFloorUnitIds = floorUnits.map((u: any) => u.id).filter(Boolean);
+    const automaticUnitIds = [...new Set(selectedFloors.flatMap((floor: any) => {
+        const units = floor.rooms || floor.units || [];
+        const selected = units.filter((unit: any) => newTask.unitIds.includes(unit.id));
+        return (selected.length ? selected : units).map((unit: any) => unit.id);
+    }))];
     const selectedTaskUnits = selectedTaskForSubTask?.taskUnits?.map((tu: any) => tu.unit).filter(Boolean) || [];
     const selectedTaskUnitIds = selectedTaskUnits.map((u: any) => u.id).filter(Boolean);
     const areAllFloorsSelected = allFloorIds.length > 0 && newTask.floorIds.length === allFloorIds.length;
@@ -109,6 +115,11 @@ export function ProjectTasks() {
 
     const handleSaveTaskDef = async () => {
         if (!newTask.title || !projectId) return;
+        setSaveError('');
+        if (!newTask.allowSubTaskCreation && !automaticUnitIds.length) {
+            setSaveError('Select at least one unit or a floor containing units.');
+            return;
+        }
         try {
             const payload = {
                 projectId,
@@ -129,7 +140,7 @@ export function ProjectTasks() {
             setEditTaskId(null);
             setNewTask({ title: '', description: '', estimatedHours: 0, price: 0, allowSubTaskCreation: false, floorIds: [], unitIds: [] });
         } catch (err) {
-            console.error('Error saving task', err);
+            setSaveError(String((err as any)?.data?.message || (err as any)?.message || 'Task could not be saved'));
         }
     };
 
@@ -253,7 +264,7 @@ export function ProjectTasks() {
                             </div>
                             {canManageTaskPrice && (
                                 <div className="space-y-2">
-                                    <Label>Internal Price</Label>
+                                    <Label>Internal Price per Unit</Label>
                                     <Input
                                         type="number"
                                         min="0"
@@ -269,9 +280,13 @@ export function ProjectTasks() {
                                     checked={newTask.allowSubTaskCreation}
                                     onCheckedChange={(checked) => setNewTask(prev => ({ ...prev, allowSubTaskCreation: checked }))}
                                 />
-                                <Label className="mb-0 text-sm font-medium text-gray-700 cursor-pointer">Allow Subtasks</Label>
+                                <Label className="mb-0 text-sm font-medium text-gray-700 cursor-pointer">Allow Additional Subtasks</Label>
                             </div>
                         </div>
+                        <p className="text-sm text-gray-500">
+                            {newTask.allowSubTaskCreation ? 'Additional subtasks can be created manually.' : `${automaticUnitIds.length} automatic subtask(s), one per unit. Additional manual subtasks are disabled. Floors without an explicit unit selection include all their units.`}
+                        </p>
+                        {saveError && <p role="alert" className="text-sm text-red-600">{saveError}</p>}
                         <div className="space-y-4 pt-2">
                             <div className="space-y-2">
                                 <div className="flex items-center justify-between gap-3">
@@ -754,14 +769,14 @@ function ProjectTaskCard({ task, isSuperAdmin, canManageTaskPrice, onEdit, onAss
                             <Plus className="h-3.5 w-3.5" />
                             Assign Worker
                         </Button>
-                        <Button
+                        {task.allowSubTaskCreation && <Button
                             variant="outline"
                             className="flex-1 text-xs font-bold gap-2 border-gray-200 text-gray-700 hover:text-purple-600 hover:border-purple-200 hover:bg-purple-50"
                             onClick={() => onAddSubtask(task)}
                         >
                             <Plus className="h-3.5 w-3.5" />
                             Subtask
-                        </Button>
+                        </Button>}
                     </div>
                 )}
             </div>

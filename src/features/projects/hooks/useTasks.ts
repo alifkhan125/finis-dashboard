@@ -124,6 +124,8 @@ export function useUpdateTask() {
         },
         onSuccess: () => {
             queryClient.invalidateQueries({ queryKey: ['tasks'] });
+            queryClient.invalidateQueries({ queryKey: ['task'] });
+            queryClient.invalidateQueries({ queryKey: ['subtasks'] });
             queryClient.invalidateQueries({ queryKey: ['project'] });
             queryClient.invalidateQueries({ queryKey: ['project-analysis'] });
         },
@@ -234,6 +236,7 @@ export function useReviewSubTaskReport() {
             queryClient.invalidateQueries({ queryKey: ['subtask', variables.subTaskId] });
             queryClient.invalidateQueries({ queryKey: ['subtasks'] });
             queryClient.invalidateQueries({ queryKey: ['tasks'] });
+            queryClient.invalidateQueries({ queryKey: ['task'] });
             queryClient.invalidateQueries({ queryKey: ['project'] });
         },
     });

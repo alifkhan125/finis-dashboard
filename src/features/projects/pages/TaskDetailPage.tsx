@@ -6,7 +6,7 @@ import { Badge } from '@/shared/components/ui/Badge';
 import { Button } from '@/shared/components/ui/Button';
 import { ArrowLeft, Clock, MapPin, User, FileText, CheckCircle, XCircle, Trash2, Flag, AlertCircle, Image, DollarSign, Package, Plus } from 'lucide-react';
 import { format } from 'date-fns';
-import { ROUTES } from '@/config/routes';
+import { ROUTES, buildRoute } from '@/config/routes';
 import { config } from '@/config/env';
 import { CreateExpenseModal } from '@/features/expenses/components/CreateExpenseModal';
 import { selectAuthUser } from '@/store/authSlice';
@@ -167,7 +167,8 @@ export function TaskDetailPage() {
     const isPendingApproval = normalizedApprovalDecision === 'pending';
     const isApproved = normalizedApprovalDecision === 'approved';
     const isAwaitingCompletionReview = normalizedStatus === 'review';
-    const canReviewCompletion = isAwaitingCompletionReview;
+    const childTasks = !isSubtask && Array.isArray(data.subTasks) ? data.subTasks : [];
+    const canReviewCompletion = isAwaitingCompletionReview && childTasks.length === 0;
     const isReviewDecisionPending = isReviewingCompletion || isReviewingSubTaskReport;
     const isCompleted = normalizedStatus === 'completed';
 
@@ -505,12 +506,24 @@ export function TaskDetailPage() {
                 )}
             </div>
 
+            {childTasks.length > 0 && (
+                <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100 space-y-3">
+                    <h2 className="font-bold text-gray-900 text-lg">Unit Subtasks</h2>
+                    <p className="text-sm text-gray-500">Review each unit separately. The main task completes when all subtasks are approved.</p>
+                    {childTasks.map((child: any) => (
+                        <Button key={child.id} variant="outline" className="w-full justify-between" onClick={() => navigate(buildRoute.subtaskDetail(resolvedProjectId, child.id))}>
+                            <span>{child.title} {child.unit?.name ? `— ${child.unit.name}` : ''}</span>
+                            <span>{child.status}</span>
+                        </Button>
+                    ))}
+                </div>
+            )}
             {/* Completion Review */}
             <div className="bg-white rounded-2xl p-6 shadow-sm border border-indigo-100">
                 <div className="flex items-center gap-2 mb-4"><Flag className="w-5 h-5 text-indigo-500" /><h2 className="font-bold text-gray-900 text-lg">Completion Review</h2></div>
                 <div className={`${canReviewCompletion ? 'bg-indigo-50 border-indigo-200' : 'bg-gray-50 border-gray-200'} border rounded-xl p-4 mb-4`}>
                     <p className={`font-semibold text-sm ${canReviewCompletion ? 'text-indigo-800' : 'text-gray-700'}`}>
-                        {canReviewCompletion ? 'Worker submitted this task for completion review' : 'Completion review is not available for this status'}
+                        {childTasks.length ? 'Approve the unit subtasks above' : canReviewCompletion ? 'Worker submitted this task for completion review' : 'Completion review is not available for this status'}
                     </p>
                     <p className={`text-sm mt-0.5 ${canReviewCompletion ? 'text-indigo-600' : 'text-gray-500'}`}>
                         {canReviewCompletion ? 'Review the submitted work above and approve or request revision.' : 'Buttons stay visible here, but they unlock only when task status is review.'}
