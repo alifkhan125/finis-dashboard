@@ -9,7 +9,7 @@ import {
   CreateCompanyModal
 } from '../components';
 import { Company } from '@/shared/types';
-import { useCompanies, useCreateCompany, useCompanyStats } from '../hooks/useCompanies';
+import { useCompanies, useCreateCompany } from '../hooks/useCompanies';
 import { useToggleCompanyStatusMutation } from '@/store/companiesApi';
 import { useAppSelector } from '@/store/hooks';
 import { selectAuthUser } from '@/store/authSlice';
@@ -32,7 +32,7 @@ export function CompaniesPage() {
   const [industryFilter, setIndustryFilter] = useState('all');
   const [timeFilter, setTimeFilter] = useState('monthly');
   const [customDateRange, setCustomDateRange] = useState<{ start: Date; end: Date } | null>(null);
-  const { stats: companyStats } = useCompanyStats(timeFilter, customDateRange);
+
 
   const handleToggleStatus = async (companyId: string) => {
     try {
@@ -71,9 +71,9 @@ export function CompaniesPage() {
   // Filter Logic
   const filteredCompanies = companies.filter(company => {
     // 1. Search (Debounced)
-    const matchesSearch = debouncedSearchQuery === '' ||
-      company.name.toLowerCase().includes(debouncedSearchQuery.toLowerCase()) ||
-      (company.location && company.location.toLowerCase().includes(debouncedSearchQuery.toLowerCase()));
+    const matchesSearch = debouncedSearchQuery.trim() === '' ||
+      company.name.toLowerCase().includes(debouncedSearchQuery.trim().toLowerCase()) ||
+      (company.location && company.location.toLowerCase().includes(debouncedSearchQuery.trim().toLowerCase()));
 
     // 2. Status
     const matchesStatus = statusFilter === 'all' || company.status === statusFilter;
@@ -82,42 +82,39 @@ export function CompaniesPage() {
     const matchesIndustry = industryFilter === 'all' ||
       (company.industry && company.industry.toLowerCase() === industryFilter.toLowerCase());
 
-    // 4. Time Filter
-    let matchesTime = true;
-    const now = new Date();
+    // Match companies created inside both boundaries of the selected period.
     const companyDate = new Date(company.createdAt);
-
-    let filterEnd: Date | null = null;
-    const today = new Date(now.setHours(0, 0, 0, 0));
-
+    const start = new Date();
+    start.setHours(0, 0, 0, 0);
+    const end = new Date(start);
     switch (timeFilter) {
+      case 'today':
       case 'daily':
-        filterEnd = new Date(today);
-        filterEnd.setHours(23, 59, 59, 999);
+        end.setDate(end.getDate() + 1);
         break;
       case 'weekly':
-        const endOfWeek = new Date(today);
-        endOfWeek.setDate(today.getDate() + (6 - today.getDay()));
-        endOfWeek.setHours(23, 59, 59, 999);
-        filterEnd = endOfWeek;
+        start.setDate(start.getDate() - (start.getDay() + 6) % 7);
+        end.setTime(start.getTime());
+        end.setDate(end.getDate() + 7);
         break;
       case 'monthly':
-        filterEnd = new Date(today.getFullYear(), today.getMonth() + 1, 0, 23, 59, 59, 999);
+        start.setDate(1);
+        end.setTime(start.getTime());
+        end.setMonth(end.getMonth() + 1);
         break;
       case 'yearly':
-        filterEnd = new Date(today.getFullYear(), 11, 31, 23, 59, 59, 999);
+        start.setMonth(0, 1);
+        end.setTime(start.getTime());
+        end.setFullYear(end.getFullYear() + 1);
         break;
       case 'custom':
         if (customDateRange) {
-          filterEnd = customDateRange.end;
-          filterEnd.setHours(23, 59, 59, 999);
+          start.setTime(customDateRange.start.getTime());
+          end.setTime(customDateRange.end.getTime() + 1);
         }
         break;
     }
-
-    if (filterEnd) {
-      matchesTime = companyDate <= filterEnd;
-    }
+    const matchesTime = companyDate >= start && companyDate < end;
 
     return matchesSearch && matchesStatus && matchesIndustry && matchesTime;
   });
@@ -136,8 +133,10 @@ export function CompaniesPage() {
       <SEO title="Companies Management" description="Manage and monitor all construction companies and contractors on the FinisPro platform." />
       <CompaniesHeader
         onFilterChange={(filter) => {
-          setTimeFilter(filter);
-          if (filter !== 'custom') setCustomDateRange(null);
+          if (filter !== 'custom') {
+            setTimeFilter(filter);
+            setCustomDateRange(null);
+          }
         }}
         onCustomDateChange={(start, end) => {
           setCustomDateRange({ start, end });
@@ -148,7 +147,8 @@ export function CompaniesPage() {
         isSuperAdmin={isSuperAdmin}
       />
 
-      <CompanyStats companies={filteredCompanies} stats={companyStats} />
+      <p className="text-sm text-gray-500">Showing companies created in the selected period. Summary totals follow the date, search, status and industry filters.</p>
+      <CompanyStats companies={filteredCompanies} />
 
       <CompanyFilters
         searchQuery={searchQuery}

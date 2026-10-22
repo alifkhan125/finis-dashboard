@@ -31,8 +31,11 @@ const EMPTY_FORM = {
 export function CreateCompanyModal({ isOpen, onClose, onCreateCompany }: CreateCompanyModalProps) {
   const [createCompanyMutation, { isLoading: isCreating }] = useCreateCompanyMutation();
   const [updateCompanyMutation] = useUpdateCompanyMutation();
-  const { data: admins } = useGetAdminsQuery({ role: 'admin' });
   const { data: me } = useMeQuery();
+  const isSuperAdmin = me?.role === 'super_admin';
+  const { data: admins } = useGetAdminsQuery({ role: 'admin' }, {
+    skip: !isOpen || !isSuperAdmin,
+  });
 
   const [formData, setFormData] = useState(EMPTY_FORM);
   const [logoFile, setLogoFile] = useState<File | null>(null);
@@ -223,7 +226,7 @@ export function CreateCompanyModal({ isOpen, onClose, onCreateCompany }: CreateC
                 placeholder={me?.fullName ? `Current user: ${me.fullName}` : 'Assign to current user'}
                 options={[
                   { label: me?.fullName ? `Current user: ${me.fullName}` : 'Assign to current user', value: '' },
-                  ...(admins?.map((a) => ({ label: `${a.fullName} — ${a.email}`, value: a.id })) ?? []),
+                  ...(isSuperAdmin ? admins?.map((a) => ({ label: `${a.fullName} — ${a.email}`, value: a.id })) ?? [] : []),
                 ]}
                 value={ownerId ?? ''}
                 onChange={(e) => {

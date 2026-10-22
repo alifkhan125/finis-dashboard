@@ -16,7 +16,7 @@ export function CompanyStats({ companies = [], stats }: CompanyStatsProps) {
   const totalRevenue = companies.reduce((sum, c) => sum + (c.annualRevenue || 0), 0);
   const avgRevenue = totalCompanies > 0 ? totalRevenue / totalCompanies : 0;
 
-  // Mock trends for now
+  // Period comparisons are only available when supplied by the stats endpoint.
   const cards = stats ? [{
     title: 'Total Companies',
     value: stats.totalCompanies.value.toString(),
@@ -52,7 +52,7 @@ export function CompanyStats({ companies = [], stats }: CompanyStatsProps) {
   }] : [{
     title: 'Total Companies',
     value: totalCompanies.toString(),
-    trend: '+12%',
+    trend: null,
     trendUp: true,
     icon: Building2,
     color: 'text-blue-600',
@@ -60,7 +60,7 @@ export function CompanyStats({ companies = [], stats }: CompanyStatsProps) {
   }, {
     title: 'Active Companies',
     value: activeCompanies.toString(),
-    trend: '+5%',
+    trend: null,
     trendUp: true,
     icon: ClipboardList,
     color: 'text-orange-600',
@@ -68,7 +68,7 @@ export function CompanyStats({ companies = [], stats }: CompanyStatsProps) {
   }, {
     title: 'Total Revenue',
     value: formatCurrency(totalRevenue),
-    trend: '+18%',
+    trend: null,
     trendUp: true,
     icon: DollarSign,
     color: 'text-green-600',
@@ -76,7 +76,7 @@ export function CompanyStats({ companies = [], stats }: CompanyStatsProps) {
   }, {
     title: 'Avg Revenue',
     value: formatCurrency(avgRevenue),
-    trend: '-2%',
+    trend: null,
     trendUp: false,
     icon: TrendingUp,
     color: 'text-purple-600',
@@ -92,9 +92,9 @@ export function CompanyStats({ companies = [], stats }: CompanyStatsProps) {
               <div className={`rounded-xl p-3 ${stat.bg}`}>
                 <stat.icon className={`h-6 w-6 ${stat.color}`} />
               </div>
-              <span className={`text-xs font-medium px-2 py-1 rounded-full ${stat.trendUp ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
+              {stat.trend != null && <span className={`text-xs font-medium px-2 py-1 rounded-full ${stat.trendUp ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}`}>
                 {stat.trend}
-              </span>
+              </span>}
             </div>
             <div className="mt-4">
               <p className="text-sm font-medium text-gray-500">{stat.title}</p>
