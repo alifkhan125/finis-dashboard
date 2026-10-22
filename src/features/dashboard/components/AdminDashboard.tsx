@@ -68,8 +68,16 @@ function AdminDashboardSkeleton() {
 export function AdminDashboard() {
   const navigate = useNavigate();
   const [activeFilter, setActiveFilter] = useState<DashboardFilter>('monthly');
+  const [customRange, setCustomRange] = useState<{ start: Date; end: Date } | null>(null);
 
-  const { data, isLoading, error, refetch } = useGetAdminDashboardQuery();
+  const { currentData: data, isFetching, error, refetch } = useGetAdminDashboardQuery({
+    filter: activeFilter,
+    ...(activeFilter === 'custom' && customRange ? {
+      customStartDate: customRange.start.toISOString(),
+      customEndDate: customRange.end.toISOString(),
+    } : {}),
+  });
+  const isLoading = isFetching && !data;
 
   const formatCurrency = (val: number) =>
     new Intl.NumberFormat('en-US', {
@@ -107,9 +115,22 @@ export function AdminDashboard() {
 
       {/* Header */}
       <DashboardHeader
-        onFilterChange={(f) => setActiveFilter(f as DashboardFilter)}
-        onCustomDateChange={() => {}}
+        onFilterChange={(f) => {
+          if (f !== 'custom') {
+            setActiveFilter(f as DashboardFilter);
+            setCustomRange(null);
+          }
+        }}
+        onCustomDateChange={(start, end) => {
+          setCustomRange({ start, end });
+          setActiveFilter('custom');
+        }}
       />
+      <p className="text-sm text-gray-500">
+        The filter applies to tasks created in the selected period and recent activity.
+        Task charts show their current completion by creation month. Preset periods use UTC.
+        Company, project, workforce, budget, plan usage and today&apos;s attendance show current totals.
+      </p>
 
       {error && (
         <div className="flex items-center justify-between gap-4 rounded-2xl border border-red-100 bg-red-50 px-4 py-3 text-sm text-red-700">
@@ -263,7 +284,8 @@ export function AdminDashboard() {
                 key={card.title}
                 title={card.title}
                 value={card.value}
-                trend={card.trend}
+                // The admin endpoint has no period comparison: its legacy
+                // trend field contains placeholders or a completion rate.
                 icon={card.title === 'Active Tasks' ? ClipboardList : CheckCircle2}
                 color={card.color}
                 bgGradient={card.bgGradient}

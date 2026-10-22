@@ -7,7 +7,7 @@ import { cn } from '@/shared/utils';
 interface StatCardProps {
   title: string;
   value: number | string;
-  trend: number;
+  trend?: number;
   icon: React.ElementType;
   color: string;
   bgGradient?: string;
@@ -25,7 +25,8 @@ export function StatCard({
   isCurrency = false,
   isCount = false
 }: StatCardProps) {
-  const isPositive = trend >= 0;
+  const hasTrend = typeof trend === 'number' && Number.isFinite(trend);
+  const isPositive = hasTrend && trend >= 0;
 
   const formatValue = () => {
     if (isCurrency) return `$${Number(value).toLocaleString()}`;
@@ -54,10 +55,10 @@ export function StatCard({
             <div className="text-2xl sm:text-3xl font-bold text-gray-900 truncate" title={formatValue()}>
               {formatValue()}
             </div>
-            <div className={cn('flex items-center gap-1 mt-1 text-xs font-medium', isPositive ? 'text-green-600' : 'text-red-600')}>
+            {hasTrend && <div className={cn('flex items-center gap-1 mt-1 text-xs font-medium', isPositive ? 'text-green-600' : 'text-red-600')}>
               {isPositive ? <ArrowUpRight className="h-3 w-3" /> : <ArrowDownRight className="h-3 w-3" />}
               {Math.abs(trend)}%
-            </div>
+            </div>}
           </div>
 
           <div className="h-16 w-16">

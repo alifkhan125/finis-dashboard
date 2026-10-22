@@ -108,9 +108,16 @@ export const dashboardApi = createApi({
             },
             providesTags: ['Dashboard'],
         }),
-        getAdminDashboard: builder.query<AdminDashboardData, void>({
-            query: () => ({
+        getAdminDashboard: builder.query<AdminDashboardData, DashboardQueryArgs | void>({
+            query: (args) => ({
                 url: '/admin/dashboard',
+                params: args ? {
+                    period: args.filter,
+                    ...(args.filter === 'custom' ? {
+                        startDate: args.customStartDate,
+                        endDate: args.customEndDate,
+                    } : {}),
+                } : undefined,
             }),
             transformResponse: (
                 response: ApiEnvelope<AdminDashboardData> | AdminDashboardData,

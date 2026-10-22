@@ -41,7 +41,10 @@ export function DateRangeFilter({ onFilterChange, onCustomDateChange, className,
     const handleUpdateView = () => {
         if (startDate && onCustomDateChange) {
             if (isRangeMode && endDate) {
-                onCustomDateChange(startDate, endDate);
+                if (endDate < startDate) return;
+                const endOfDay = new Date(endDate);
+                endOfDay.setHours(23, 59, 59, 999);
+                onCustomDateChange(startDate, endOfDay);
             } else if (!isRangeMode) {
                 // If single mode, send same date for start and end
                 const endOfDay = new Date(startDate);
@@ -151,7 +154,7 @@ export function DateRangeFilter({ onFilterChange, onCustomDateChange, className,
                             </div>
                             <Button
                                 onClick={handleUpdateView}
-                                disabled={!startDate || (isRangeMode && !endDate)}
+                                disabled={!startDate || (isRangeMode && (!endDate || endDate < startDate))}
                                 className="w-full bg-[#1D4F6D] hover:bg-[#0f2331] text-white h-10 rounded-xl text-[9px] font-black uppercase tracking-[0.1em] shadow-lg shadow-blue-900/10 active:scale-95 transition-all disabled:opacity-30"
                             >
                                 Set Custom View
