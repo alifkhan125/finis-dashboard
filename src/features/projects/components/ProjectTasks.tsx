@@ -190,7 +190,11 @@ export function ProjectTasks() {
     };
 
     const handleSaveSubTask = async () => {
-        if (!newSubTask.title || !selectedTaskForSubTask || newSubTask.unitIds.length === 0) return;
+        if (
+            !newSubTask.title ||
+            !selectedTaskForSubTask ||
+            (!editingSubTaskId && newSubTask.unitIds.length === 0)
+        ) return;
         try {
             const payload = {
                 title: newSubTask.title,
