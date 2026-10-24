@@ -201,10 +201,10 @@ export function WorkforcePage() {
 
   return (
     <div className="space-y-8 pb-8">
-      <SEO title="Workforce Management" description="Monitor and manage your construction team, roles, and project assignments." />
+      <SEO title="Workers Management" description="Monitor and manage your construction team, roles, and project assignments." />
       {/* Header */}
       <PageHeader
-        title="Workforce"
+        title="Workers"
         description="Manage your team of professionals, their roles and assignments"
         icon={Users}
       >

@@ -1,6 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
 import { Plus, Edit, Trash2, DollarSign, RefreshCw } from 'lucide-react';
-import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Card } from '@/shared/components/ui/Card';
 import { Button } from '@/shared/components/ui/Button';
 import { PageHeader } from '@/shared/components/ui/PageHeader';
@@ -26,11 +25,6 @@ function normalizeFeatureList(plan: SubscriptionPlanApi) {
     plan.hasWhiteLabel ? 'White label' : null,
     plan.supportLevel ? `Support: ${plan.supportLevel}` : null,
   ].filter(Boolean) as string[];
-}
-
-function formatMoney(value?: number | null) {
-  if (value === null || value === undefined) return '$0';
-  return `$${new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 }).format(value)}`;
 }
 
 type PlanFormState = {
@@ -98,22 +92,6 @@ export function SubscriptionPlansPage() {
       : 0;
     return { total: plans.length, active, average };
   }, [plans]);
-
-  const chartData = useMemo(
-    () =>
-      plans.map((plan) => ({
-        name: plan.name,
-        monthly: plan.priceMonthly ?? 0,
-        yearly: plan.priceYearly ?? 0,
-        features:
-          Number(Boolean(plan.hasGeofencing)) +
-          Number(Boolean(plan.hasAdvancedReporting)) +
-          Number(Boolean(plan.hasCustomReporting)) +
-          Number(Boolean(plan.hasWhiteLabel)) +
-          Number(Boolean(plan.supportLevel)),
-      })),
-    [plans],
-  );
 
   if (!isSuperAdmin) {
     return <PublicSubscriptionPlansPage isDashboardView={true} />;
@@ -195,67 +173,6 @@ export function SubscriptionPlansPage() {
         </Button>
       </PageHeader>
 
-      <Card className="overflow-hidden rounded-3xl border-gray-100 shadow-sm">
-        <div className="flex flex-col gap-4 border-b border-gray-100 bg-gradient-to-r from-slate-50 to-white p-6 lg:flex-row lg:items-end lg:justify-between">
-          <div>
-            <div className="text-xs font-bold uppercase tracking-[0.22em] text-gray-400">Unique subscription graph</div>
-            <h2 className="mt-2 text-2xl font-black tracking-tight text-gray-900">Pricing vs feature density</h2>
-            <p className="mt-1 max-w-2xl text-sm text-gray-500">
-              This chart compares monthly and yearly pricing for every plan, with a feature density score for quick package inspection.
-            </p>
-          </div>
-          <div className="grid grid-cols-3 gap-3 text-center text-xs">
-            <div className="rounded-2xl bg-white px-4 py-3 shadow-sm">
-              <div className="text-[11px] uppercase tracking-[0.18em] text-gray-400">Total</div>
-              <div className="mt-1 text-xl font-black text-gray-900">{stats.total}</div>
-            </div>
-            <div className="rounded-2xl bg-white px-4 py-3 shadow-sm">
-              <div className="text-[11px] uppercase tracking-[0.18em] text-gray-400">Active</div>
-              <div className="mt-1 text-xl font-black text-emerald-600">{stats.active}</div>
-            </div>
-            <div className="rounded-2xl bg-white px-4 py-3 shadow-sm">
-              <div className="text-[11px] uppercase tracking-[0.18em] text-gray-400">Avg Monthly</div>
-              <div className="mt-1 text-xl font-black text-violet-600">${stats.average}</div>
-            </div>
-          </div>
-        </div>
-        <div className="p-6">
-          <div className="h-[320px]">
-            {chartData.length ? (
-              <ResponsiveContainer width="100%" height="100%">
-                <BarChart data={chartData} margin={{ top: 10, right: 20, left: 0, bottom: 10 }}>
-                  <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
-                  <XAxis dataKey="name" axisLine={false} tickLine={false} tick={{ fill: '#6B7280', fontSize: 12, fontWeight: 700 }} />
-                  <YAxis axisLine={false} tickLine={false} tick={{ fill: '#6B7280', fontSize: 12, fontWeight: 700 }} />
-                  <Tooltip
-                    cursor={{ fill: 'rgba(29,79,109,0.06)' }}
-                    content={({ active, payload }) => {
-                      if (!active || !payload?.length) return null;
-                      const data = payload[0].payload as { name: string; monthly: number; yearly: number; features: number };
-                      return (
-                        <div className="rounded-2xl border border-gray-100 bg-white p-4 shadow-xl">
-                          <div className="text-xs font-bold uppercase tracking-[0.18em] text-gray-400">{data.name}</div>
-                          <div className="mt-2 space-y-1 text-sm">
-                            <div className="flex items-center justify-between gap-8"><span className="text-gray-500">Monthly</span><span className="font-black text-gray-900">{formatMoney(data.monthly)}</span></div>
-                            <div className="flex items-center justify-between gap-8"><span className="text-gray-500">Yearly</span><span className="font-black text-gray-900">{formatMoney(data.yearly)}</span></div>
-                            <div className="flex items-center justify-between gap-8"><span className="text-gray-500">Feature score</span><span className="font-black text-[#1D4F6D]">{data.features}</span></div>
-                          </div>
-                        </div>
-                      );
-                    }}
-                  />
-                  <Bar dataKey="monthly" fill="#1D4F6D" radius={[10, 10, 0, 0]} name="Monthly" />
-                  <Bar dataKey="yearly" fill="#8B5CF6" radius={[10, 10, 0, 0]} name="Yearly" />
-                </BarChart>
-              </ResponsiveContainer>
-            ) : (
-              <div className="flex h-full items-center justify-center rounded-2xl border border-dashed border-gray-200 bg-gray-50 text-sm text-gray-500">
-                No subscription plans found.
-              </div>
-            )}
-          </div>
-        </div>
-      </Card>
 
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
         <Card className="p-6">

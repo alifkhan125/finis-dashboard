@@ -117,7 +117,7 @@ export function WorkerDetailPage() {
             className="flex items-center gap-1 text-gray-500 hover:text-[#1D4F6D] font-medium transition-colors"
           >
             <ChevronLeft className="h-4 w-4" />
-            Workforce
+            Workers
           </button>
           <span className="text-gray-300">/</span>
           <span className="text-gray-900 font-bold">{worker.name}</span>

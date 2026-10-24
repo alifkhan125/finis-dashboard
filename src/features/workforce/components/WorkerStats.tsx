@@ -9,7 +9,7 @@ interface WorkerStatsProps {
 
 export function WorkerStats({ total, activeToday, onLeave, avgAttendance }: WorkerStatsProps) {
   const stats = [{
-    title: 'Total Workforce',
+    title: 'Total Workers',
     value: String(total),
     trend: 'Live',
     trendUp: true,

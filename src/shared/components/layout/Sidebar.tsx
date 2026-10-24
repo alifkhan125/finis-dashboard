@@ -27,7 +27,7 @@ const menuItems = [
     items: [
       { icon: UserCog, label: 'Admins', path: '/admins' },
       { icon: Users, label: 'Managers', path: '/managers' },
-      { icon: HardHat, label: 'Workforce', path: '/workforce' }
+      { icon: HardHat, label: 'Workers', path: '/workforce' }
     ]
   },
   {
