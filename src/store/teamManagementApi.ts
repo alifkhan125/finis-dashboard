@@ -53,6 +53,12 @@ export interface SuperAdminUser {
     totalWorker: number;
     project: number;
     totalProject: number;
+    totalUsers?: number;
+    subscriptionLimits?: {
+        companies: number | null;
+        projects: number | null;
+        users: number | null;
+    };
     subscriptionType: string;
     isExemptFromSubscription: boolean;
     companies?: SuperAdminUserCompany[];

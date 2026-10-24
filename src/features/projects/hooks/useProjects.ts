@@ -290,7 +290,11 @@ const buildCreatePayload = (data: Partial<Project>) => ({
     isWholeHouse: data.type === 'house' ? data.projectConfig?.houseType !== 'sections' : undefined,
     houseSections: toBackendHouseSections(data.projectConfig?.sections),
     numFloors: data.floors?.length,
+    numFloorsMin: (data as any).floorStart ? Number((data as any).floorStart) : undefined,
+    numFloorsMax: (data as any).floorEnd ? Number((data as any).floorEnd) : undefined,
     unitPerFloor: data.type === 'apartment_building' ? data.floors?.[0]?.rooms.length : undefined,
+    unitPerFloorMin: (data as any).unitStart ? Number((data as any).unitStart) : undefined,
+    unitPerFloorMax: (data as any).unitEnd ? Number((data as any).unitEnd) : undefined,
     autoGenerateFloors: data.type === 'apartment_building' ? true : undefined,
 });
 
@@ -301,6 +305,10 @@ const buildUpdatePayload = (data: Partial<Project>) => ({
     description: data.description,
     startDate: data.startDate,
     endDate: data.endDate,
+    numFloorsMin: (data as any).floorStart ? Number((data as any).floorStart) : undefined,
+    numFloorsMax: (data as any).floorEnd ? Number((data as any).floorEnd) : undefined,
+    unitPerFloorMin: (data as any).unitStart ? Number((data as any).unitStart) : undefined,
+    unitPerFloorMax: (data as any).unitEnd ? Number((data as any).unitEnd) : undefined,
     budget: data.budget,
     progress: data.progress,
     location: data.address,

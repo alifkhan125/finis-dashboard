@@ -151,7 +151,7 @@ export function UsersPage() {
         <div className="flex items-center gap-2">
           <span className="inline-flex items-center justify-center h-7 px-3 rounded-xl bg-blue-50 text-blue-700 font-bold text-xs border border-blue-100">
             <Building2 className="w-3.5 h-3.5 mr-1 text-blue-500" />
-            {user.totalCompany ?? 0}
+              {user.totalCompany ?? 0}/{user.subscriptionLimits?.companies ?? '∞'}
           </span>
         </div>
       ),
@@ -162,7 +162,7 @@ export function UsersPage() {
       render: (user) => (
         <span className="inline-flex items-center justify-center h-7 px-2.5 rounded-xl bg-indigo-50 text-indigo-700 font-bold text-xs border border-indigo-100">
           <Briefcase className="w-3.5 h-3.5 mr-1 text-indigo-500" />
-          {user.project ?? user.totalProject ?? 0}
+          {user.project ?? user.totalProject ?? 0}/{user.subscriptionLimits?.projects ?? '∞'}
         </span>
       ),
     },
@@ -172,7 +172,7 @@ export function UsersPage() {
       render: (user) => (
         <span className="inline-flex items-center justify-center h-7 px-2.5 rounded-xl bg-slate-50 text-slate-700 font-bold text-xs border border-slate-200">
           <Users className="w-3.5 h-3.5 mr-1 text-slate-500" />
-          {1 + (user.totalManager ?? 0) + (user.totalWorker ?? 0)}
+          {user.totalUsers ?? (1 + (user.totalManager ?? 0) + (user.totalWorker ?? 0))}/{user.subscriptionLimits?.users ?? '∞'}
         </span>
       ),
     },

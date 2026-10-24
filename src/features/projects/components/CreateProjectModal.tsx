@@ -40,8 +40,10 @@ export function CreateProjectModal({
     hasBudget: boolean;
     description: string;
     address: string;
-    floorCount: string;
-    roomsPerFloor: string;
+    floorStart: string;
+    floorEnd: string;
+    unitStart: string;
+    unitEnd: string;
     houseType: 'whole_house' | 'sections';
     sections: string[];
   }
@@ -60,8 +62,10 @@ export function CreateProjectModal({
     description: project?.description || '',
     address: project?.address || '',
     // Config fields (attempting to restore from existing structure would be complex, simplified for Edit to just show basic info unless we parse 'floors')
-    floorCount: project?.type === 'apartment_building' ? project.floors.length.toString() : '',
-    roomsPerFloor: '', // Difficult to infer perfectly
+    floorStart: project?.numFloorsMin?.toString() || '1',
+    floorEnd: project?.numFloorsMax?.toString() || '',
+    unitStart: project?.unitPerFloorMin?.toString() || '1',
+    unitEnd: project?.unitPerFloorMax?.toString() || '',
     houseType: project?.projectConfig?.houseType || 'whole_house',
     sections: project?.projectConfig?.sections || []
   });
@@ -80,6 +84,10 @@ export function CreateProjectModal({
         companyName: formData.companyName,
         startDate: formData.startDate,
         endDate: formData.endDate || undefined,
+        floorStart: formData.floorStart,
+        floorEnd: formData.floorEnd || undefined,
+        unitStart: formData.unitStart,
+        unitEnd: formData.unitEnd || undefined,
         budget: formData.hasBudget ? (parseFloat(formData.budget.replace(/[^0-9.]/g, '')) || 0) : 0,
         hasBudget: formData.hasBudget,
         description: formData.description,
@@ -96,17 +104,19 @@ export function CreateProjectModal({
     const projectId = `proj-${Date.now()}`;
 
     if (formData.type === 'apartment_building') {
-      const numFloors = parseInt(formData.floorCount) || 1;
-      const numRooms = parseInt(formData.roomsPerFloor) || 1;
+      const floorStart = parseInt(formData.floorStart) || 1;
+      const floorEnd = parseInt(formData.floorEnd) || floorStart;
+      const unitStart = parseInt(formData.unitStart) || 1;
+      const unitEnd = parseInt(formData.unitEnd) || unitStart;
 
-      for (let i = 1; i <= numFloors; i++) {
+      for (let i = floorStart; i <= floorEnd; i++) {
         const floorId = `floor-${Date.now()}-${i}`;
         const rooms = [];
-        for (let j = 1; j <= numRooms; j++) {
+        for (let j = unitStart; j <= unitEnd; j++) {
           rooms.push({
             id: `room-${Date.now()}-${i}-${j}`,
             floorId,
-            number: `${i}${j.toString().padStart(2, '0')}`, // e.g., 101, 102
+            number: `${i}${j.toString().padStart(2, '0')}`,
             name: `Unit ${i}${j.toString().padStart(2, '0')}`,
             type: 'Unit',
             status: 'pending',
@@ -169,6 +179,10 @@ export function CreateProjectModal({
       companyName: formData.companyName,
       startDate: formData.startDate,
       endDate: formData.endDate || undefined,
+      floorStart: formData.floorStart,
+      floorEnd: formData.floorEnd || undefined,
+      unitStart: formData.unitStart,
+      unitEnd: formData.unitEnd || undefined,
       type: formData.type,
       projectConfig: {
         houseType: formData.houseType,
@@ -205,8 +219,10 @@ export function CreateProjectModal({
       hasBudget: true,
       description: '',
       address: '',
-      floorCount: '',
-      roomsPerFloor: '',
+      floorStart: '1',
+      floorEnd: '',
+      unitStart: '1',
+      unitEnd: '',
       houseType: 'whole_house',
       sections: []
     });
@@ -317,8 +333,10 @@ export function CreateProjectModal({
                       ...formData,
                       type,
                       // Reset config when type changes
-                      floorCount: '',
-                      roomsPerFloor: '',
+                      floorStart: '1',
+                      floorEnd: '',
+                      unitStart: '1',
+                      unitEnd: '',
                       houseType: 'whole_house',
                       sections: []
                     });
@@ -351,24 +369,46 @@ export function CreateProjectModal({
             {formData.type === 'apartment_building' && (
               <div className="grid grid-cols-2 gap-4 animate-in fade-in slide-in-from-top-2">
                 <div>
-                  <label className="text-xs font-semibold text-gray-500 mb-1 block">Number of Floors</label>
+                  <label className="text-xs font-semibold text-gray-500 mb-1 block">Floor Start</label>
                   <Input
                     type="number"
                     min="1"
-                    placeholder="e.g. 5"
-                    value={formData.floorCount}
-                    onChange={(e) => setFormData({ ...formData, floorCount: e.target.value })}
+                    placeholder="e.g. 1"
+                    value={formData.floorStart}
+                    onChange={(e) => setFormData({ ...formData, floorStart: e.target.value })}
                     className="h-11 bg-white"
                   />
                 </div>
                 <div>
-                  <label className="text-xs font-semibold text-gray-500 mb-1 block">Rooms per Floor</label>
+                  <label className="text-xs font-semibold text-gray-500 mb-1 block">Floor End</label>
+                  <Input
+                    type="number"
+                    min="1"
+                    placeholder="e.g. 5"
+                    value={formData.floorEnd}
+                    onChange={(e) => setFormData({ ...formData, floorEnd: e.target.value })}
+                    className="h-11 bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-gray-500 mb-1 block">Unit Start</label>
+                  <Input
+                    type="number"
+                    min="1"
+                    placeholder="e.g. 1"
+                    value={formData.unitStart}
+                    onChange={(e) => setFormData({ ...formData, unitStart: e.target.value })}
+                    className="h-11 bg-white"
+                  />
+                </div>
+                <div>
+                  <label className="text-xs font-semibold text-gray-500 mb-1 block">Unit End</label>
                   <Input
                     type="number"
                     min="1"
                     placeholder="e.g. 4"
-                    value={formData.roomsPerFloor}
-                    onChange={(e) => setFormData({ ...formData, roomsPerFloor: e.target.value })}
+                    value={formData.unitEnd}
+                    onChange={(e) => setFormData({ ...formData, unitEnd: e.target.value })}
                     className="h-11 bg-white"
                   />
                 </div>

@@ -34,7 +34,6 @@ const menuItems = [
     section: 'TIME & PAYROLL',
     items: [
       { icon: Clock, label: 'Time Tracking', path: '/time-tracking' },
-      { icon: CalendarClock, label: 'Shift Adjustments', path: '/time-tracking/adjustments' },
       { icon: MapPin, label: 'Geofencing', path: '/geofencing' },
       { icon: Calculator, label: 'Payroll', path: '/payroll' }
     ]
