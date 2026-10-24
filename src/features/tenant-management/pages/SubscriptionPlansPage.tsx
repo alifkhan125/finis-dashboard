@@ -40,6 +40,7 @@ type PlanFormState = {
   hasCustomReporting: boolean;
   hasWhiteLabel: boolean;
   isActive: boolean;
+  visibility: 'public' | 'private';
 };
 
 const initialForm: PlanFormState = {
@@ -55,6 +56,7 @@ const initialForm: PlanFormState = {
   hasCustomReporting: false,
   hasWhiteLabel: false,
   isActive: true,
+  visibility: 'public',
 };
 
 export function SubscriptionPlansPage() {
@@ -67,6 +69,8 @@ export function SubscriptionPlansPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<SubscriptionPlanApi | null>(null);
   const [form, setForm] = useState<PlanFormState>(initialForm);
+  const [isSaving, setIsSaving] = useState(false);
+  const [formError, setFormError] = useState('');
 
   const loadPlans = async () => {
     if (!isSuperAdmin) return;
@@ -99,12 +103,14 @@ export function SubscriptionPlansPage() {
 
   const openCreate = () => {
     setEditingPlan(null);
+    setFormError('');
     setForm(initialForm);
     setFormOpen(true);
   };
 
   const openEdit = (plan: SubscriptionPlanApi) => {
     setEditingPlan(plan);
+    setFormError('');
     setForm({
       name: plan.name,
       priceMonthly: String(plan.priceMonthly ?? 0),
@@ -118,6 +124,7 @@ export function SubscriptionPlansPage() {
       hasCustomReporting: Boolean(plan.hasCustomReporting),
       hasWhiteLabel: Boolean(plan.hasWhiteLabel),
       isActive: Boolean(plan.isActive),
+      visibility: plan.visibility ?? 'public',
     });
     setFormOpen(true);
   };
@@ -136,18 +143,26 @@ export function SubscriptionPlansPage() {
       hasWhiteLabel: form.hasWhiteLabel,
       supportLevel: form.supportLevel.trim() || undefined,
       isActive: form.isActive,
+      visibility: form.visibility,
     };
 
-    if (editingPlan) {
-      await updatePlan(editingPlan.id, payload, token || undefined);
-    } else {
-      await createPlan(payload, token || undefined);
+    setIsSaving(true);
+    setFormError('');
+    try {
+      if (editingPlan) {
+        await updatePlan(editingPlan.id, payload, token || undefined);
+      } else {
+        await createPlan(payload, token || undefined);
+      }
+      setFormOpen(false);
+      setEditingPlan(null);
+      setForm(initialForm);
+      await loadPlans();
+    } catch (error) {
+      setFormError(error instanceof Error ? error.message : 'Unable to save subscription plan');
+    } finally {
+      setIsSaving(false);
     }
-
-    setFormOpen(false);
-    setEditingPlan(null);
-    setForm(initialForm);
-    await loadPlans();
   };
 
   const handleDelete = async (id: string) => {
@@ -199,6 +214,9 @@ export function SubscriptionPlansPage() {
                 <h3 className="text-2xl font-bold">{plan.name}</h3>
                 <Badge className={plan.isActive ? 'bg-green-100 text-green-800' : 'bg-gray-100 text-gray-800'}>
                   {plan.isActive ? 'Active' : 'Inactive'}
+                </Badge>
+                <Badge className={plan.visibility === 'private' ? 'bg-amber-100 text-amber-800' : 'bg-blue-100 text-blue-800'}>
+                  {plan.visibility === 'private' ? 'Private' : 'Public'}
                 </Badge>
               </div>
               <div className="mb-6">
@@ -263,9 +281,22 @@ export function SubscriptionPlansPage() {
         maxWidth="2xl"
       >
         <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          {formError && <div className="md:col-span-2 rounded-lg bg-red-50 px-3 py-2 text-sm text-red-700">{formError}</div>}
           <div className="space-y-2 md:col-span-2">
             <label className="text-sm font-medium text-gray-700">Plan Name</label>
             <Input value={form.name} onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))} />
+          </div>
+          <div className="space-y-2">
+            <label className="text-sm font-medium text-gray-700">Visibility *</label>
+            <select
+              required
+              value={form.visibility}
+              onChange={(e) => setForm((prev) => ({ ...prev, visibility: e.target.value as 'public' | 'private' }))}
+              className="h-10 w-full rounded-md border border-gray-300 bg-white px-3 text-sm"
+            >
+              <option value="public">Public </option>
+              <option value="private">Private </option>
+            </select>
           </div>
           <div className="space-y-2">
             <label className="text-sm font-medium text-gray-700">Monthly Price</label>
@@ -314,7 +345,7 @@ export function SubscriptionPlansPage() {
         </div>
         <div className="mt-6 flex justify-end gap-3">
           <Button variant="outline" onClick={() => setFormOpen(false)}>Cancel</Button>
-          <Button onClick={submitForm}>{editingPlan ? 'Save Changes' : 'Create Plan'}</Button>
+          <Button onClick={submitForm} disabled={isSaving}>{isSaving ? 'Saving...' : editingPlan ? 'Save Changes' : 'Create Plan'}</Button>
         </div>
       </Modal>
     </div>

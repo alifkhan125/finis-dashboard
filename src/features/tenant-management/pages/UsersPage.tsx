@@ -1,22 +1,16 @@
-import { useState, useMemo } from 'react';
+import { useState, useMemo, useEffect } from 'react';
 import {
   Users,
   Search,
   RefreshCw,
   Building2,
   Briefcase,
-  HardHat,
   ShieldCheck,
   Phone,
   Mail,
-  UserCheck,
-  UserX,
   CreditCard,
-  Sparkles,
   CheckCircle2,
   XCircle,
-  MoreVertical,
-  SlidersHorizontal,
   UserPlus,
 } from 'lucide-react';
 import { Card } from '@/shared/components/ui/Card';
@@ -27,23 +21,33 @@ import { Table, Column } from '@/shared/components/ui/Table';
 import { Avatar, AvatarFallback, AvatarImage } from '@/shared/components/ui/Avatar';
 import { PageHeader } from '@/shared/components/ui/PageHeader';
 import { Modal } from '@/shared/components/ui/Modal';
+import { useAppSelector } from '@/store/hooks';
+import { selectAuthToken } from '@/store/authSlice';
+import { assignPlanToUser, getPlans, type SubscriptionPlanApi } from '../services/subscriptionApi';
 import {
   useGetSuperAdminUsersQuery,
-  useToggleSubscriptionExemptionMutation,
   useUpdateSuperAdminUserStatusMutation,
   useSendInviteMutation,
   type SuperAdminUser,
 } from '@/store/teamManagementApi';
 
 export function UsersPage() {
+  const token = useAppSelector(selectAuthToken);
   const { data: users = [], isLoading, isFetching, isError, error, refetch } = useGetSuperAdminUsersQuery({ role: 'admin' });
-  const [toggleExemption, { isLoading: isToggling }] = useToggleSubscriptionExemptionMutation();
   const [updateStatus, { isLoading: isUpdatingStatus }] = useUpdateSuperAdminUserStatusMutation();
 
   const [searchQuery, setSearchQuery] = useState('');
   const [statusFilter, setStatusFilter] = useState<'all' | 'active' | 'inactive' | 'suspended'>('all');
   const [selectedUser, setSelectedUser] = useState<SuperAdminUser | null>(null);
   const [isInviteModalOpen, setIsInviteModalOpen] = useState(false);
+  const [isSubscriptionModalOpen, setIsSubscriptionModalOpen] = useState(false);
+  const [plans, setPlans] = useState<SubscriptionPlanApi[]>([]);
+  const [selectedPlanId, setSelectedPlanId] = useState('');
+  const [isAssigningPlan, setIsAssigningPlan] = useState(false);
+
+  useEffect(() => {
+    void getPlans(token || undefined).then((response) => setPlans(response.data.plans)).catch(() => setPlans([]));
+  }, [token]);
 
   // Filtered users (admins)
   const filteredUsers = useMemo(() => {
@@ -64,22 +68,13 @@ export function UsersPage() {
 
   // Aggregate Stats
   const stats = useMemo(() => {
-    const totalUsers = users.length;
+    const totalUsers = users.reduce((acc, u) => acc + 1 + (u.totalManager || 0) + (u.totalWorker || 0), 0);
     const activeUsers = users.filter((u) => u.status === 'active').length;
     const totalCompanies = users.reduce((acc, u) => acc + (u.totalCompany || 0), 0);
     const totalProjects = users.reduce((acc, u) => acc + (u.project || 0), 0);
-    const totalWorkforce = users.reduce((acc, u) => acc + (u.totalManager || 0) + (u.totalWorker || 0), 0);
 
-    return { totalUsers, activeUsers, totalCompanies, totalProjects, totalWorkforce };
+    return { totalUsers, activeUsers, totalCompanies, totalProjects };
   }, [users]);
-
-  const handleToggleExemption = async (userId: string) => {
-    try {
-      await toggleExemption(userId).unwrap();
-    } catch (err) {
-      console.error('Failed to toggle subscription exemption:', err);
-    }
-  };
 
   const handleStatusChange = async (userId: string, nextStatus: string) => {
     try {
@@ -89,6 +84,19 @@ export function UsersPage() {
       }
     } catch (err) {
       console.error('Failed to update status:', err);
+    }
+  };
+
+  const handleAssignPlan = async () => {
+    if (!selectedUser || !selectedPlanId) return;
+    setIsAssigningPlan(true);
+    try {
+      await assignPlanToUser(selectedUser.id, { planId: selectedPlanId }, token || undefined);
+      await refetch();
+      setSelectedUser(null);
+      setSelectedPlanId('');
+    } finally {
+      setIsAssigningPlan(false);
     }
   };
 
@@ -140,43 +148,12 @@ export function UsersPage() {
       key: 'companies',
       header: 'Total Company',
       render: (user) => (
-        <div className="flex flex-col gap-1">
-          <div className="flex items-center gap-2">
-            <span className="inline-flex items-center justify-center h-7 px-3 rounded-xl bg-blue-50 text-blue-700 font-bold text-xs border border-blue-100">
-              <Building2 className="w-3.5 h-3.5 mr-1 text-blue-500" />
-              {user.totalCompany ?? 0}
-            </span>
-          </div>
-          {user.companies && user.companies.length > 0 && (
-            <span
-              className="text-[11px] text-gray-500 font-medium truncate max-w-[150px]"
-              title={user.companies.map((c) => c.name).join(', ')}
-            >
-              {user.companies[0].name}
-              {user.companies.length > 1 && ` +${user.companies.length - 1} more`}
-            </span>
-          )}
+        <div className="flex items-center gap-2">
+          <span className="inline-flex items-center justify-center h-7 px-3 rounded-xl bg-blue-50 text-blue-700 font-bold text-xs border border-blue-100">
+            <Building2 className="w-3.5 h-3.5 mr-1 text-blue-500" />
+            {user.totalCompany ?? 0}
+          </span>
         </div>
-      ),
-    },
-    {
-      key: 'managers',
-      header: 'Total Manager',
-      render: (user) => (
-        <span className="inline-flex items-center justify-center h-7 px-2.5 rounded-xl bg-purple-50 text-purple-700 font-bold text-xs border border-purple-100">
-          <UserCheck className="w-3.5 h-3.5 mr-1 text-purple-500" />
-          {user.totalManager ?? 0}
-        </span>
-      ),
-    },
-    {
-      key: 'workers',
-      header: 'Total Worker',
-      render: (user) => (
-        <span className="inline-flex items-center justify-center h-7 px-2.5 rounded-xl bg-amber-50 text-amber-700 font-bold text-xs border border-amber-100">
-          <HardHat className="w-3.5 h-3.5 mr-1 text-amber-500" />
-          {user.totalWorker ?? 0}
-        </span>
       ),
     },
     {
@@ -186,6 +163,16 @@ export function UsersPage() {
         <span className="inline-flex items-center justify-center h-7 px-2.5 rounded-xl bg-indigo-50 text-indigo-700 font-bold text-xs border border-indigo-100">
           <Briefcase className="w-3.5 h-3.5 mr-1 text-indigo-500" />
           {user.project ?? user.totalProject ?? 0}
+        </span>
+      ),
+    },
+    {
+      key: 'users',
+      header: 'Total Users',
+      render: (user) => (
+        <span className="inline-flex items-center justify-center h-7 px-2.5 rounded-xl bg-slate-50 text-slate-700 font-bold text-xs border border-slate-200">
+          <Users className="w-3.5 h-3.5 mr-1 text-slate-500" />
+          {1 + (user.totalManager ?? 0) + (user.totalWorker ?? 0)}
         </span>
       ),
     },
@@ -251,20 +238,6 @@ export function UsersPage() {
             onClick={() => setSelectedUser(user)}
           >
             Details
-          </Button>
-          <Button
-            size="sm"
-            variant={user.isExemptFromSubscription ? 'secondary' : 'outline'}
-            className={`h-8 px-2.5 text-xs font-semibold rounded-lg ${
-              user.isExemptFromSubscription
-                ? 'bg-emerald-100 text-emerald-800 hover:bg-emerald-200'
-                : 'text-gray-600 hover:bg-gray-100'
-            }`}
-            disabled={isToggling}
-            onClick={() => handleToggleExemption(user.id)}
-            title="Toggle Free Access"
-          >
-            {user.isExemptFromSubscription ? 'Free' : 'Make Free'}
           </Button>
         </div>
       ),
@@ -337,14 +310,14 @@ export function UsersPage() {
         <Card className="p-5 border-gray-100 shadow-sm rounded-2xl bg-white transition-all hover:shadow-md">
           <div className="flex items-center justify-between">
             <div>
-              <div className="text-xs uppercase font-bold tracking-wider text-gray-400">Total Workforce</div>
-              <div className="mt-2 text-3xl font-black text-gray-900">{stats.totalWorkforce}</div>
+              <div className="text-xs uppercase font-bold tracking-wider text-gray-400">Total Users</div>
+              <div className="mt-2 text-3xl font-black text-gray-900">{stats.totalUsers}</div>
             </div>
             <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-purple-50 text-purple-600">
-              <HardHat className="h-6 w-6" />
+              <Users className="h-6 w-6" />
             </div>
           </div>
-          <div className="mt-3 text-xs text-gray-500 font-medium">Managers and workers</div>
+          <div className="mt-3 text-xs text-gray-500 font-medium">Admins, managers and workers</div>
         </Card>
       </div>
 
@@ -527,11 +500,18 @@ export function UsersPage() {
             <div className="space-y-3 p-4 rounded-xl border border-gray-100 text-sm">
               <div className="flex items-center justify-between py-1 border-b border-gray-100">
                 <span className="text-gray-500">Subscription Type</span>
-                <span className="font-bold text-gray-900">
+                <button
+                  type="button"
+                  className="font-bold text-[#1D4F6D] underline underline-offset-2 hover:text-[#163a50]"
+                  onClick={() => {
+                    setSelectedPlanId('');
+                    setIsSubscriptionModalOpen(true);
+                  }}
+                >
                   {selectedUser.isExemptFromSubscription
                     ? 'Free'
                     : selectedUser.subscriptionType || 'No'}
-                </span>
+                </button>
               </div>
               <div className="flex items-center justify-between py-1 border-b border-gray-100">
                 <span className="text-gray-500">Status</span>
@@ -566,19 +546,51 @@ export function UsersPage() {
                 {selectedUser.status === 'active' ? 'Suspend User' : 'Activate User'}
               </Button>
               <Button
-                variant="outline"
-                disabled={isToggling}
-                className="h-10 px-4 text-xs font-bold rounded-xl border-gray-200"
-                onClick={() => handleToggleExemption(selectedUser.id)}
-              >
-                {selectedUser.isExemptFromSubscription ? 'Remove Free Access' : 'Make Free (Exempt)'}
-              </Button>
-              <Button
                 variant="secondary"
                 className="h-10 px-4 text-xs font-bold rounded-xl"
                 onClick={() => setSelectedUser(null)}
               >
                 Close
+              </Button>
+            </div>
+          </div>
+        </Modal>
+      )}
+
+      {selectedUser && (
+        <Modal
+          isOpen={isSubscriptionModalOpen}
+          onClose={() => setIsSubscriptionModalOpen(false)}
+          title="Assign Subscription"
+          maxWidth="md"
+        >
+          <div className="space-y-4">
+            <div className="rounded-xl border border-blue-100 bg-blue-50/50 p-4">
+              <div className="text-sm font-bold text-gray-900">{selectedUser.fullName}</div>
+              <div className="mt-1 text-xs text-gray-500">Choose a plan to assign to this admin account.</div>
+            </div>
+            <select
+              value={selectedPlanId}
+              onChange={(e) => setSelectedPlanId(e.target.value)}
+              className="h-10 w-full rounded-lg border border-gray-200 bg-white px-3 text-sm"
+            >
+              <option value="">Select plan</option>
+              {plans.map((plan) => (
+                <option key={plan.id} value={plan.id}>
+                  {plan.name} ({plan.visibility === 'private' ? 'Private' : 'Public'})
+                </option>
+              ))}
+            </select>
+            <div className="flex justify-end gap-2">
+              <Button variant="outline" onClick={() => setIsSubscriptionModalOpen(false)}>Cancel</Button>
+              <Button
+                disabled={!selectedPlanId || isAssigningPlan}
+                onClick={async () => {
+                  await handleAssignPlan();
+                  setIsSubscriptionModalOpen(false);
+                }}
+              >
+                {isAssigningPlan ? 'Assigning...' : 'Assign Subscription'}
               </Button>
             </div>
           </div>

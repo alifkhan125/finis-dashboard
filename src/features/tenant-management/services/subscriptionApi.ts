@@ -22,6 +22,7 @@ async function request<T>(path: string, options: RequestInit = {}, token?: strin
 export type SubscriptionPlanApi = {
   id: string;
   name: string;
+  visibility: 'public' | 'private';
   priceMonthly: number;
   priceYearly?: number | null;
   stripeProductId?: string | null;
@@ -273,6 +274,10 @@ export async function createTenant(body: Record<string, unknown>, token?: string
 
 export async function updateTenantPlan(id: string, body: { planId: string }, token?: string) {
   return request(`/tenants/${id}/plan`, { method: 'PATCH', body: JSON.stringify(body) }, token);
+}
+
+export async function assignPlanToUser(id: string, body: { planId: string }, token?: string) {
+  return request(`/../users/${id}/subscription`, { method: 'PATCH', body: JSON.stringify(body) }, token);
 }
 
 export async function updateTenantStatus(id: string, body: { status: string }, token?: string) {

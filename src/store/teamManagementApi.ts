@@ -39,6 +39,7 @@ export interface SuperAdminUserCompany {
 
 export interface SuperAdminUser {
     id: string;
+    tenantId?: string | null;
     name: string;
     fullName: string;
     email: string;
