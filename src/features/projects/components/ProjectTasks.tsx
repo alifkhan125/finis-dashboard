@@ -13,7 +13,7 @@ import { Label } from '@/shared/components/ui/Label';
 import { Select } from '@/shared/components/ui/Select';
 import { Switch } from '@/shared/components/ui/Switch';
 import { Dropdown } from '@/shared/components/ui/Dropdown';
-import { useTasks, useCreateTask, useAssignTask, useUpdateTask, useDeleteTask, useSubTasks, useCreateSubTask, useSubTaskDetails } from '../hooks/useTasks';
+import { useTasks, useCreateTask, useAssignTask, useUpdateTask, useDeleteTask, useSubTasks, useCreateSubTask, useSubTaskDetails, useUpdateSubTask } from '../hooks/useTasks';
 import { useProjectTeam, useProjectFloors } from '../hooks/useProjects';
 
 export function ProjectTasks() {
@@ -45,6 +45,8 @@ export function ProjectTasks() {
     const [selectedTaskForSubTask, setSelectedTaskForSubTask] = useState<any>(null);
 
     const { createSubTask, isCreatingSubTask } = useCreateSubTask();
+    const { updateSubTask, isUpdatingSubTask } = useUpdateSubTask();
+    const [editingSubTaskId, setEditingSubTaskId] = useState<string | null>(null);
 
     // Form State for New Task Definition
     const [newTask, setNewTask] = useState<{
@@ -60,7 +62,7 @@ export function ProjectTasks() {
         description: '',
         estimatedHours: 0,
         price: 0,
-        allowSubTaskCreation: false,
+        allowSubTaskCreation: true,
         floorIds: [],
         unitIds: []
     });
@@ -116,7 +118,7 @@ export function ProjectTasks() {
     const handleSaveTaskDef = async () => {
         if (!newTask.title || !projectId) return;
         setSaveError('');
-        if (!newTask.allowSubTaskCreation && !automaticUnitIds.length) {
+        if (!automaticUnitIds.length) {
             setSaveError('Select at least one unit or a floor containing units.');
             return;
         }
@@ -138,7 +140,7 @@ export function ProjectTasks() {
             }
             setIsAddModalOpen(false);
             setEditTaskId(null);
-            setNewTask({ title: '', description: '', estimatedHours: 0, price: 0, allowSubTaskCreation: false, floorIds: [], unitIds: [] });
+            setNewTask({ title: '', description: '', estimatedHours: 0, price: 0, allowSubTaskCreation: true, floorIds: [], unitIds: [] });
         } catch (err) {
             setSaveError(String((err as any)?.data?.message || (err as any)?.message || 'Task could not be saved'));
         }
@@ -190,14 +192,19 @@ export function ProjectTasks() {
     const handleSaveSubTask = async () => {
         if (!newSubTask.title || !selectedTaskForSubTask || newSubTask.unitIds.length === 0) return;
         try {
-            await createSubTask(selectedTaskForSubTask.id, {
+            const payload = {
                 title: newSubTask.title,
                 description: newSubTask.description,
                 estimatedHours: newSubTask.estimatedHours,
                 ...(canManageTaskPrice ? { price: newSubTask.price || 0 } : {}),
-                unitIds: newSubTask.unitIds
-            });
+            };
+            if (editingSubTaskId) {
+                await updateSubTask(editingSubTaskId, payload);
+            } else {
+                await createSubTask(selectedTaskForSubTask.id, { ...payload, unitIds: newSubTask.unitIds });
+            }
             setIsSubTaskModalOpen(false);
+            setEditingSubTaskId(null);
             setNewSubTask({ title: '', description: '', estimatedHours: 0, price: 0, unitIds: [] });
             setSelectedTaskForSubTask(null);
         } catch (err) {
@@ -228,7 +235,7 @@ export function ProjectTasks() {
                 onClose={() => {
                     setIsAddModalOpen(false);
                     setEditTaskId(null);
-                    setNewTask({ title: '', description: '', estimatedHours: 0, price: 0, allowSubTaskCreation: false, floorIds: [], unitIds: [] });
+                    setNewTask({ title: '', description: '', estimatedHours: 0, price: 0, allowSubTaskCreation: true, floorIds: [], unitIds: [] });
                 }}
                 title={editTaskId ? "Edit Task" : "Create Task"}
                 maxWidth="md"
@@ -284,7 +291,7 @@ export function ProjectTasks() {
                             </div>
                         </div>
                         <p className="text-sm text-gray-500">
-                            {newTask.allowSubTaskCreation ? 'Additional subtasks can be created manually.' : `${automaticUnitIds.length} automatic subtask(s), one per unit. Additional manual subtasks are disabled. Floors without an explicit unit selection include all their units.`}
+                            {automaticUnitIds.length} automatic subtask(s) will be created, one per unit. {newTask.allowSubTaskCreation ? 'Additional subtasks can also be created manually.' : 'Additional manual subtasks are disabled. Floors without an explicit unit selection include all their units.'}
                         </p>
                         {saveError && <p role="alert" className="text-sm text-red-600">{saveError}</p>}
                         <div className="space-y-4 pt-2">
@@ -477,6 +484,18 @@ export function ProjectTasks() {
                                 setNewSubTask({ title: '', description: '', estimatedHours: 0, price: 0, unitIds: defaultUnitIds });
                                 setIsSubTaskModalOpen(true); 
                             }}
+                            onEditSubtask={(taskValue, subtaskValue) => {
+                                setSelectedTaskForSubTask(taskValue);
+                                setEditingSubTaskId(subtaskValue.id);
+                                setNewSubTask({
+                                    title: subtaskValue.title || subtaskValue.task?.title || '',
+                                    description: subtaskValue.description || '',
+                                    estimatedHours: Number(subtaskValue.estimatedHours || subtaskValue.task?.estimatedHours || 0),
+                                    price: Number(subtaskValue.price || 0),
+                                    unitIds: (subtaskValue.units || subtaskValue.subTaskUnits || []).map((item: any) => item.unit?.id || item.unitId).filter(Boolean),
+                                });
+                                setIsSubTaskModalOpen(true);
+                            }}
                         />
                     ))
                 )}
@@ -509,10 +528,11 @@ export function ProjectTasks() {
                 isOpen={isSubTaskModalOpen}
                 onClose={() => {
                     setIsSubTaskModalOpen(false);
+                    setEditingSubTaskId(null);
                     setSelectedTaskForSubTask(null);
                     setNewSubTask({ title: '', description: '', estimatedHours: 0, price: 0, unitIds: [] });
                 }}
-                title="Create Subtask"
+                title={editingSubTaskId ? "Edit Subtask" : "Create Subtask"}
                 maxWidth="md"
             >
                 <div className="space-y-6">
@@ -608,13 +628,13 @@ export function ProjectTasks() {
                         </div>
                     </div>
                     <div className="pt-4 border-t border-gray-100 flex justify-end gap-3">
-                        <Button variant="outline" onClick={() => setIsSubTaskModalOpen(false)}>Cancel</Button>
+                        <Button variant="outline" onClick={() => { setIsSubTaskModalOpen(false); setEditingSubTaskId(null); }}>Cancel</Button>
                         <Button
                             className="bg-purple-600 hover:bg-purple-700 text-white"
                             onClick={handleSaveSubTask}
-                            disabled={!newSubTask.title || newSubTask.unitIds.length === 0 || isCreatingSubTask}
+                            disabled={!newSubTask.title || (!editingSubTaskId && newSubTask.unitIds.length === 0) || isCreatingSubTask || isUpdatingSubTask}
                         >
-                            {isCreatingSubTask ? 'Creating...' : 'Create Subtask'}
+                            {isCreatingSubTask || isUpdatingSubTask ? 'Saving...' : editingSubTaskId ? 'Save Changes' : 'Create Subtask'}
                         </Button>
                     </div>
                 </div>
@@ -623,7 +643,7 @@ export function ProjectTasks() {
     );
 }
 
-function ProjectTaskCard({ task, isSuperAdmin, canManageTaskPrice, onEdit, onAssign, onDelete, onAddSubtask }: { task: any, isSuperAdmin: boolean, canManageTaskPrice?: boolean, onEdit: (t: any) => void, onAssign: (t: any) => void, onDelete: (t: any) => void, onAddSubtask: (t: any) => void }) {
+function ProjectTaskCard({ task, isSuperAdmin, canManageTaskPrice, onEdit, onAssign, onDelete, onAddSubtask, onEditSubtask }: { task: any, isSuperAdmin: boolean, canManageTaskPrice?: boolean, onEdit: (t: any) => void, onAssign: (t: any) => void, onDelete: (t: any) => void, onAddSubtask: (t: any) => void, onEditSubtask: (task: any, subtask: any) => void }) {
     const navigate = useNavigate();
     const { data: subtasksRaw, isLoading } = useSubTasks(task.id);
     const subtasks = (subtasksRaw as any)?.data || (Array.isArray(subtasksRaw) ? subtasksRaw : []);
@@ -744,6 +764,19 @@ function ProjectTaskCard({ task, isSuperAdmin, canManageTaskPrice, onEdit, onAss
                                         </div>
                                     )}
                                     <div className="flex items-center gap-1.5">
+                                        {!isSuperAdmin && (
+                                            <Button
+                                                type="button"
+                                                variant="outline"
+                                                className="h-6 px-2 text-[10px] font-bold"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    onEditSubtask(task, st);
+                                                }}
+                                            >
+                                                <Edit2 className="mr-1 h-3 w-3" /> Edit
+                                            </Button>
+                                        )}
                                         {canManageTaskPrice && (
                                             <div className="text-[10px] font-bold text-emerald-700 bg-emerald-50 border border-emerald-100 px-2 py-0.5 rounded">
                                                 ${Number(st.price || 0).toFixed(2)}

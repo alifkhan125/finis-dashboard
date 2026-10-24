@@ -267,6 +267,27 @@ export function useDeleteSubTask() {
         isDeletingSubTask: mutation.isPending,
     };
 }
+
+export function useUpdateSubTask() {
+    const queryClient = useQueryClient();
+    const mutation = useMutation({
+        mutationFn: async ({ subTaskId, data }: { subTaskId: string; data: any }) => {
+            const response = await apiClient.put<any>(API_ENDPOINTS.TASKS.SUBTASK_DETAIL(subTaskId), data);
+            return unwrap(response.data);
+        },
+        onSuccess: (_, variables) => {
+            queryClient.invalidateQueries({ queryKey: ['subtask', variables.subTaskId] });
+            queryClient.invalidateQueries({ queryKey: ['subtasks'] });
+            queryClient.invalidateQueries({ queryKey: ['tasks'] });
+            queryClient.invalidateQueries({ queryKey: ['project'] });
+        },
+    });
+
+    return {
+        updateSubTask: (subTaskId: string, data: any) => mutation.mutateAsync({ subTaskId, data }),
+        isUpdatingSubTask: mutation.isPending,
+    };
+}
 export function useReviewTaskCompletion() {
     const queryClient = useQueryClient();
 
