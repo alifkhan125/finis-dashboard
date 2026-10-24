@@ -1,5 +1,5 @@
 import { useState, useEffect, useRef } from 'react';
-import { Search, Bell, ChevronDown, LogOut, Settings, Menu, Sparkles } from 'lucide-react';
+import { Search, Bell, ChevronDown, LogOut, Settings, Menu, Sparkles, Building2, RotateCcw } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { Input } from '@/shared/components/ui/Input';
 import { Avatar, AvatarFallback, AvatarImage } from '@/shared/components/ui/Avatar';
@@ -9,7 +9,17 @@ import { Dropdown } from '@/shared/components/ui/Dropdown';
 import { cn } from '@/shared/utils';
 import { useNotifications } from '@/shared/hooks/useNotifications';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
-import { clearAuth, selectAuthUser } from '@/store/authSlice';
+import {
+  clearAuth,
+  selectAuthUser,
+  selectIsSwitched,
+  switchToCompany,
+  returnFromSwitched,
+} from '@/store/authSlice';
+import {
+  useSwitchToMyCompanyMutation,
+  useReturnToSuperAdminMutation,
+} from '@/store/teamManagementApi';
 import { config } from '@/config/env';
 
 const searchableItems = [
@@ -28,6 +38,12 @@ export function Header({ onMenuToggle }: HeaderProps) {
   const navigate = useNavigate();
   const dispatch = useAppDispatch();
   const authUser = useAppSelector(selectAuthUser);
+  const isSwitched = useAppSelector(selectIsSwitched);
+  const isSuperAdmin = authUser?.role === 'super_admin';
+
+  const [switchToMyCompany, { isLoading: isSwitching }] = useSwitchToMyCompanyMutation();
+  const [returnToSuperAdmin, { isLoading: isReturning }] = useReturnToSuperAdminMutation();
+
   const [isNotificationsOpen, setIsNotificationsOpen] = useState(false);
   const [isSearchOpen, setIsSearchOpen] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -52,7 +68,51 @@ export function Header({ onMenuToggle }: HeaderProps) {
     return () => document.removeEventListener("mousedown", handleClickOutside);
   }, []);
 
+  const handleSwitchToMyCompany = async () => {
+    try {
+      const res = await switchToMyCompany().unwrap();
+      if (res?.accessToken && res?.user) {
+        dispatch(switchToCompany({ token: res.accessToken, user: res.user }));
+        navigate('/', { replace: true });
+        window.location.reload();
+      }
+    } catch (err) {
+      console.error('Failed to switch to company:', err);
+    }
+  };
+
+  const handleReturnToSuperAdmin = async () => {
+    try {
+      const res = await returnToSuperAdmin().unwrap();
+      if (res?.accessToken && res?.user) {
+        dispatch(returnFromSwitched({ token: res.accessToken, user: res.user }));
+        navigate('/', { replace: true });
+        window.location.reload();
+      }
+    } catch (err) {
+      console.error('Failed to return to super admin:', err);
+    }
+  };
+
   const profileItems = [
+    ...(isSuperAdmin && !isSwitched
+      ? [
+          {
+            label: isSwitching ? 'Switching...' : 'Switch to My Company',
+            icon: Building2,
+            onClick: handleSwitchToMyCompany,
+          },
+        ]
+      : []),
+    ...(isSwitched
+      ? [
+          {
+            label: isReturning ? 'Switching...' : 'Switch to Super Admin',
+            icon: RotateCcw,
+            onClick: handleReturnToSuperAdmin,
+          },
+        ]
+      : []),
     {
       label: 'Notifications',
       icon: Bell,
@@ -70,7 +130,7 @@ export function Header({ onMenuToggle }: HeaderProps) {
         dispatch(clearAuth());
         navigate('/login', { replace: true });
       },
-      variant: 'destructive' as const
+      variant: 'destructive' as const,
     },
   ];
 

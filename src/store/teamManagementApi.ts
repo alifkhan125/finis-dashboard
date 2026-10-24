@@ -23,6 +23,20 @@ export interface ManagerStats {
     totalProjectsManaged: number;
 }
 
+export interface SuperAdminUserCompany {
+    id: string;
+    name: string;
+    industry?: string | null;
+    email?: string | null;
+    phone?: string | null;
+    logoUrl?: string | null;
+    projectsCount: number;
+    managersCount: number;
+    workersCount: number;
+    isActive?: boolean;
+    createdAt?: string;
+}
+
 export interface SuperAdminUser {
     id: string;
     name: string;
@@ -31,6 +45,7 @@ export interface SuperAdminUser {
     phone?: string | null;
     avatarUrl?: string | null;
     role: string;
+    displayRole?: string;
     status: string;
     totalCompany: number;
     totalManager: number;
@@ -39,6 +54,7 @@ export interface SuperAdminUser {
     totalProject: number;
     subscriptionType: string;
     isExemptFromSubscription: boolean;
+    companies?: SuperAdminUserCompany[];
     createdAt: string;
     lastLoginAt?: string | null;
 }
@@ -400,6 +416,30 @@ export const teamManagementApi = createApi({
             transformResponse: (res: any) => res?.data ?? res,
             invalidatesTags: ['WorkerDocuments', 'AdminDetail'],
         }),
+        // POST /super_admin/switch/my-company
+        switchToMyCompany: builder.mutation<{ accessToken: string; user: any; company: any }, { companyName?: string } | void>({
+            query: (body) => ({
+                url: '/super_admin/switch/my-company',
+                method: 'POST',
+                body: body || {},
+            }),
+            transformResponse: (res: any) => res?.data ?? res,
+        }),
+
+        // POST /super_admin/switch/return
+        returnToSuperAdmin: builder.mutation<{ accessToken: string; user: any }, void>({
+            query: () => ({
+                url: '/super_admin/switch/return',
+                method: 'POST',
+            }),
+            transformResponse: (res: any) => res?.data ?? res,
+        }),
+
+        // GET /super_admin/switch/my-company
+        getMyCompanyStatus: builder.query<{ hasCompany: boolean; company: any }, void>({
+            query: () => '/super_admin/switch/my-company',
+            transformResponse: (res: any) => res?.data ?? res,
+        }),
     }),
 
 });
@@ -422,4 +462,7 @@ export const {
     useGetSuperAdminUsersQuery,
     useToggleSubscriptionExemptionMutation,
     useUpdateSuperAdminUserStatusMutation,
+    useSwitchToMyCompanyMutation,
+    useReturnToSuperAdminMutation,
+    useGetMyCompanyStatusQuery,
 } = teamManagementApi;

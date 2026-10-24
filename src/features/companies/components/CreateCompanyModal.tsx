@@ -220,15 +220,29 @@ export function CreateCompanyModal({ isOpen, onClose, onCreateCompany }: CreateC
             {/* Owner */}
             <div className="space-y-1.5">
               <label className="text-sm font-black text-[#1D4F6D] uppercase tracking-widest">
-                Owner <span className="text-red-500">*</span>
+                Owner (Admin) <span className="text-red-500">*</span>
               </label>
               <Select
-                placeholder={me?.fullName ? `Current user: ${me.fullName}` : 'Assign to current user'}
+                placeholder="Select company owner"
                 options={[
-                  { label: me?.fullName ? `Current user: ${me.fullName}` : 'Assign to current user', value: '' },
-                  ...(isSuperAdmin ? admins?.map((a) => ({ label: `${a.fullName} — ${a.email}`, value: a.id })) ?? [] : []),
+                  ...(me?.id
+                    ? [
+                        {
+                          label: `${me.fullName || 'Super Admin'} (You — ${me.email})`,
+                          value: me.id,
+                        },
+                      ]
+                    : []),
+                  ...(isSuperAdmin && admins
+                    ? admins
+                        .filter((a) => a.id !== me?.id)
+                        .map((a) => ({
+                          label: `${a.fullName} — ${a.email} (${a.role === 'super_admin' ? 'Super Admin' : 'Admin'})`,
+                          value: a.id,
+                        }))
+                    : []),
                 ]}
-                value={ownerId ?? ''}
+                value={ownerId ?? me?.id ?? ''}
                 onChange={(e) => {
                   setOwnerId(e.target.value || undefined);
                   setErrors((s) => ({ ...s, ownerId: undefined }));

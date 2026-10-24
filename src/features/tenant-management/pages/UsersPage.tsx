@@ -106,7 +106,16 @@ export function UsersPage() {
           </Avatar>
           <div className="flex flex-col">
             <span className="font-bold text-gray-900">{user.fullName || 'Unnamed User'}</span>
-            <span className="text-xs uppercase tracking-wider text-gray-400 font-semibold">{user.role}</span>
+            <div className="flex items-center gap-1.5 mt-0.5">
+              <span className="text-xs uppercase tracking-wider text-gray-500 font-bold">
+                Admin
+              </span>
+              {user.role === 'super_admin' && (
+                <span className="inline-flex items-center px-1.5 py-0.2 rounded text-[10px] font-bold bg-amber-100 text-amber-800 border border-amber-200">
+                  Super Admin
+                </span>
+              )}
+            </div>
           </div>
         </div>
       ),
@@ -131,11 +140,22 @@ export function UsersPage() {
       key: 'companies',
       header: 'Total Company',
       render: (user) => (
-        <div className="flex items-center gap-2">
-          <span className="inline-flex items-center justify-center h-7 px-3 rounded-xl bg-blue-50 text-blue-700 font-bold text-xs border border-blue-100">
-            <Building2 className="w-3.5 h-3.5 mr-1 text-blue-500" />
-            {user.totalCompany ?? 0}
-          </span>
+        <div className="flex flex-col gap-1">
+          <div className="flex items-center gap-2">
+            <span className="inline-flex items-center justify-center h-7 px-3 rounded-xl bg-blue-50 text-blue-700 font-bold text-xs border border-blue-100">
+              <Building2 className="w-3.5 h-3.5 mr-1 text-blue-500" />
+              {user.totalCompany ?? 0}
+            </span>
+          </div>
+          {user.companies && user.companies.length > 0 && (
+            <span
+              className="text-[11px] text-gray-500 font-medium truncate max-w-[150px]"
+              title={user.companies.map((c) => c.name).join(', ')}
+            >
+              {user.companies[0].name}
+              {user.companies.length > 1 && ` +${user.companies.length - 1} more`}
+            </span>
+          )}
         </div>
       ),
     },
@@ -416,7 +436,9 @@ export function UsersPage() {
               <div className="flex-1">
                 <div className="flex items-center justify-between">
                   <h3 className="text-lg font-bold text-gray-900">{selectedUser.fullName}</h3>
-                  <Badge className="capitalize font-semibold">{selectedUser.role}</Badge>
+                  <Badge className="capitalize font-semibold">
+                    {selectedUser.role === 'super_admin' ? 'Admin (Super Admin)' : 'Admin'}
+                  </Badge>
                 </div>
                 <p className="text-xs text-gray-500 mt-0.5">{selectedUser.email}</p>
                 <p className="text-xs text-gray-500">{selectedUser.phone || 'No phone provided'}</p>
@@ -440,6 +462,66 @@ export function UsersPage() {
                 <div className="text-[11px] uppercase tracking-wider text-gray-400 font-bold">Projects</div>
                 <div className="mt-1 text-xl font-black text-indigo-700">{selectedUser.project ?? selectedUser.totalProject ?? 0}</div>
               </div>
+            </div>
+
+            {/* Companies List */}
+            <div className="space-y-3">
+              <h4 className="text-xs font-bold uppercase tracking-wider text-gray-700 flex items-center gap-1.5">
+                <Building2 className="w-4 h-4 text-[#1D4F6D]" />
+                Companies & Organizations ({selectedUser.companies?.length ?? selectedUser.totalCompany ?? 0})
+              </h4>
+
+              {selectedUser.companies && selectedUser.companies.length > 0 ? (
+                <div className="space-y-2 max-h-56 overflow-y-auto pr-1">
+                  {selectedUser.companies.map((company) => (
+                    <div
+                      key={company.id}
+                      className="p-3.5 rounded-xl border border-gray-100 bg-gray-50/70 hover:bg-gray-50 transition-colors flex flex-col sm:flex-row sm:items-center justify-between gap-3"
+                    >
+                      <div className="flex items-start gap-3">
+                        <div className="h-9 w-9 rounded-lg bg-blue-100 text-blue-800 flex items-center justify-center font-bold text-xs uppercase flex-shrink-0">
+                          {company.name.slice(0, 2)}
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <span className="font-bold text-sm text-gray-900">{company.name}</span>
+                            <Badge
+                              className={`text-[10px] px-1.5 py-0.2 rounded-md ${
+                                company.isActive !== false
+                                  ? 'bg-emerald-100 text-emerald-800 border-emerald-200'
+                                  : 'bg-gray-200 text-gray-700'
+                              }`}
+                            >
+                              {company.isActive !== false ? 'Active' : 'Inactive'}
+                            </Badge>
+                          </div>
+                          <div className="text-xs text-gray-500 mt-0.5">
+                            {company.industry ? `Industry: ${company.industry}` : 'Contractor'}
+                            {company.email && ` • ${company.email}`}
+                            {company.phone && ` • ${company.phone}`}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-2 text-xs font-semibold text-gray-600 sm:self-center">
+                        <span className="px-2 py-1 rounded-lg bg-indigo-50 text-indigo-700 border border-indigo-100">
+                          {company.projectsCount} {company.projectsCount === 1 ? 'Project' : 'Projects'}
+                        </span>
+                        <span className="px-2 py-1 rounded-lg bg-purple-50 text-purple-700 border border-purple-100">
+                          {company.managersCount} Mgr
+                        </span>
+                        <span className="px-2 py-1 rounded-lg bg-amber-50 text-amber-700 border border-amber-100">
+                          {company.workersCount} Wkr
+                        </span>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+              ) : (
+                <div className="p-4 rounded-xl border border-dashed border-gray-200 text-center text-xs text-gray-400">
+                  No company assigned or created yet for this user.
+                </div>
+              )}
             </div>
 
             <div className="space-y-3 p-4 rounded-xl border border-gray-100 text-sm">
