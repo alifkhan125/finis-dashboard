@@ -51,7 +51,8 @@ export const ROUTES = {
     // Communication
     CHAT: '/chat',
 
-    // Tenant Management
+    // Tenant & User Management
+    USERS: '/users',
     TENANTS: '/tenants',
     SUBSCRIPTION_PLANS: '/subscription-plans',
     PUBLIC_PLANS: '/plans',

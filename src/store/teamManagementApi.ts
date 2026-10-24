@@ -23,6 +23,26 @@ export interface ManagerStats {
     totalProjectsManaged: number;
 }
 
+export interface SuperAdminUser {
+    id: string;
+    name: string;
+    fullName: string;
+    email: string;
+    phone?: string | null;
+    avatarUrl?: string | null;
+    role: string;
+    status: string;
+    totalCompany: number;
+    totalManager: number;
+    totalWorker: number;
+    project: number;
+    totalProject: number;
+    subscriptionType: string;
+    isExemptFromSubscription: boolean;
+    createdAt: string;
+    lastLoginAt?: string | null;
+}
+
 export interface WorkforceStats {
     totalWorkforce: number;
     workforceTrend: string;
@@ -253,6 +273,30 @@ export const teamManagementApi = createApi({
             invalidatesTags: (_result, _err, id) => [{ type: 'AdminDetail', id }, 'AdminList'],
         }),
 
+        // GET /super-admin/users
+        getSuperAdminUsers: builder.query<SuperAdminUser[], { role?: string } | void>({
+            query: (args) => {
+                const params = args?.role ? `?role=${args.role}` : '';
+                return `/super-admin/users${params}`;
+            },
+            transformResponse: (res: ApiEnvelope<SuperAdminUser[]> | SuperAdminUser[]) => {
+                if (Array.isArray(res)) return res;
+                return res?.data ?? [];
+            },
+            providesTags: ['AdminList'],
+        }),
+
+        // PATCH /super-admin/users/:id/status
+        updateSuperAdminUserStatus: builder.mutation<{ id: string; status: string }, { id: string; status: string }>({
+            query: ({ id, status }) => ({
+                url: `/super-admin/users/${id}/status`,
+                method: 'PATCH',
+                body: { status },
+            }),
+            transformResponse: (res: any) => res?.data ?? res,
+            invalidatesTags: ['AdminList', 'AdminDetail'],
+        }),
+
         // POST /auth/invite
         sendInvite: builder.mutation<InviteResponse, InviteRequest>({
             query: (body) => ({
@@ -261,7 +305,7 @@ export const teamManagementApi = createApi({
                 body,
             }),
             transformResponse: (res: ApiEnvelope<InviteResponse>) => res.data,
-            invalidatesTags: ['PendingInvitations', 'AdminStats'],
+            invalidatesTags: ['PendingInvitations', 'AdminStats', 'AdminList'],
         }),
 
         // POST /auth/invitations/:id/resend
@@ -375,4 +419,7 @@ export const {
     useGetWorkerDocumentsQuery,
     useUploadWorkerDocumentMutation,
     useDeleteWorkerDocumentMutation,
+    useGetSuperAdminUsersQuery,
+    useToggleSubscriptionExemptionMutation,
+    useUpdateSuperAdminUserStatusMutation,
 } = teamManagementApi;

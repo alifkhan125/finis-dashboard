@@ -57,6 +57,7 @@ const menuItems = [
   {
     section: 'SAAS MANAGEMENT',
     items: [
+      { icon: Users, label: 'Users', path: '/users' },
       { icon: Building, label: 'Tenants', path: '/tenants' },
       { icon: DollarSign, label: 'Subscription Plans', path: '/subscription-plans' }
     ]
@@ -76,13 +77,29 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
   const isSuperAdmin = authUser?.role === 'super_admin';
 
   const filteredMenuItems = useMemo(() => {
+    const superAdminHiddenPaths = new Set([
+      '/companies',
+      '/projects',
+      '/admins',
+      '/managers',
+      '/workforce',
+      '/time-tracking',
+      '/time-tracking/adjustments',
+      '/geofencing',
+      '/inventory',
+      '/reports',
+      '/quotes',
+      '/payroll',
+      '/expenses',
+    ]);
+
     return menuItems.map(section => {
       const items = section.items
         .filter(item => {
-          if (!isSuperAdmin && (item.path === '/tenants' || item.path === '/admins')) {
+          if (!isSuperAdmin && (item.path === '/tenants' || item.path === '/admins' || item.path === '/users')) {
             return false;
           }
-          if (isSuperAdmin && (item.path === '/reports' || item.path === '/quotes' || item.path === '/payroll' || item.path === '/expenses')) {
+          if (isSuperAdmin && superAdminHiddenPaths.has(item.path)) {
             return false;
           }
           return true;

@@ -28,6 +28,7 @@ const AdminsPage = lazy(() => import('@/features/admin-management/pages/AdminsPa
 const AdminDetailPage = lazy(() => import('@/features/admin-management/pages/AdminDetailPage').then((m) => ({ default: m.AdminDetailPage })));
 const ManagersPage = lazy(() => import('@/features/admin-management/pages/ManagersPage').then((m) => ({ default: m.ManagersPage })));
 const ManagerDetailPage = lazy(() => import('@/features/admin-management/pages/ManagerDetailPage').then((m) => ({ default: m.ManagerDetailPage })));
+const UsersPage = lazy(() => import('@/features/tenant-management/pages/UsersPage').then((m) => ({ default: m.UsersPage })));
 const TenantsPage = lazy(() => import('@/features/tenant-management/pages/TenantsPage').then((m) => ({ default: m.TenantsPage })));
 const SubscriptionPlansPage = lazy(() => import('@/features/tenant-management/pages/SubscriptionPlansPage').then((m) => ({ default: m.SubscriptionPlansPage })));
 const PublicSubscriptionPlansPage = lazy(() => import('@/features/tenant-management/pages/PublicSubscriptionPlansPage').then((m) => ({ default: m.PublicSubscriptionPlansPage })));
@@ -106,6 +107,7 @@ export function AppRouter() {
                     <Route path={ROUTES.QUOTES} element={<QuoteLibraryPage />} />
                     <Route path={ROUTES.CHAT} element={<ChatPage />} />
                     <Route path={ROUTES.INVENTORY} element={<InventoryPage />} />
+                    <Route path={ROUTES.USERS} element={<UsersPage />} />
                     <Route path={ROUTES.TENANTS} element={<TenantsPage />} />
                     <Route path={ROUTES.SUBSCRIPTION_PLANS} element={<SubscriptionPlansPage />} />
                     <Route path={ROUTES.SETTINGS} element={<SettingsPage />} />
