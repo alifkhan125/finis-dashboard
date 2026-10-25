@@ -105,7 +105,6 @@ export interface PaginationQuery {
 }
 
 export interface CreateInventoryItemInput {
-    projectId: string;
     name: string;
     category?: string;
     location?: string;

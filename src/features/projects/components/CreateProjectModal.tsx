@@ -4,7 +4,6 @@ import { Input } from '@/shared/components/ui/Input';
 import { Button } from '@/shared/components/ui/Button';
 import { Select } from '@/shared/components/ui/Select';
 import { Textarea } from '@/shared/components/ui/Textarea';
-import { DatePicker } from '@/shared/components/ui/DatePicker';
 import type { Company } from '@/shared/types';
 
 
@@ -277,10 +276,10 @@ export function CreateProjectModal({
             <label className="text-sm font-bold text-gray-700">
               Start Date *
             </label>
-            <DatePicker
-              date={formData.startDate ? new Date(formData.startDate) : undefined}
-              setDate={(date) => setFormData({ ...formData, startDate: date ? date.toISOString() : '' })}
-              placeholder="Select start date"
+            <Input
+              type="date"
+              value={formData.startDate ? formData.startDate.slice(0, 10) : ''}
+              onChange={(e) => setFormData({ ...formData, startDate: e.target.value ? `${e.target.value}T00:00:00.000Z` : '' })}
               className="h-11"
             />
           </div>
@@ -289,10 +288,10 @@ export function CreateProjectModal({
             <label className="text-sm font-bold text-gray-700">
               End Date
             </label>
-            <DatePicker
-              date={formData.endDate ? new Date(formData.endDate) : undefined}
-              setDate={(date) => setFormData({ ...formData, endDate: date ? date.toISOString() : '' })}
-              placeholder="Select end date"
+            <Input
+              type="date"
+              value={formData.endDate ? formData.endDate.slice(0, 10) : ''}
+              onChange={(e) => setFormData({ ...formData, endDate: e.target.value ? `${e.target.value}T00:00:00.000Z` : '' })}
               className="h-11"
             />
           </div>

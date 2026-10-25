@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState } from 'react';
 import { Modal } from '@/shared/components/ui/Modal';
 import { Button } from '@/shared/components/ui/Button';
 import { Input } from '@/shared/components/ui/Input';
@@ -6,29 +6,19 @@ import { Input } from '@/shared/components/ui/Input';
 interface AddProductModalProps {
     isOpen: boolean;
     onClose: () => void;
-    projects: { id: string; name: string }[];
-    onAdd: (item: { projectId: string; name: string; category?: string; location?: string; currentQty?: number; minStockQty?: number; unit?: string }) => void;
+    onAdd: (item: { name: string; category?: string; location?: string; currentQty?: number; minStockQty?: number; unit?: string }) => void;
 }
 
-export function AddProductModal({ isOpen, onClose, onAdd, projects }: AddProductModalProps) {
-    const [projectId, setProjectId] = useState('');
+export function AddProductModal({ isOpen, onClose, onAdd }: AddProductModalProps) {
     const [name, setName] = useState('');
     const [category, setCategory] = useState('');
     const [quantity, setQuantity] = useState('');
     const [unitType, setUnitType] = useState('Units');
     const [threshold, setThreshold] = useState('5');
 
-    // Auto-select if there is only 1 project
-    useEffect(() => {
-        if (projects.length === 1 && (!projectId || !projects.some(p => p.id === projectId))) {
-            setProjectId(projects[0].id);
-        }
-    }, [projects, projectId]);
-
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         onAdd({
-            projectId,
             name,
             category,
             currentQty: Number(quantity),
@@ -36,7 +26,6 @@ export function AddProductModal({ isOpen, onClose, onAdd, projects }: AddProduct
             minStockQty: Number(threshold),
         });
         // Reset
-        setProjectId('');
         setName('');
         setCategory('');
         setQuantity('');
@@ -47,30 +36,8 @@ export function AddProductModal({ isOpen, onClose, onAdd, projects }: AddProduct
     return (
         <Modal isOpen={isOpen} onClose={onClose} title="Add New Product">
             <form onSubmit={handleSubmit} className="space-y-4">
-                <div>
-                    <label className="text-sm font-bold text-gray-700 block mb-1">Project</label>
-                    <select
-                        value={projectId}
-                        onChange={(e) => setProjectId(e.target.value)}
-                        required
-                        className="w-full h-11 rounded-xl border border-gray-200 bg-white px-3 text-sm outline-none focus:border-blue-400"
-                    >
-                        {projects.length === 0 ? (
-                            <option value="">No projects found</option>
-                        ) : (
-                            <option value="">Select a project</option>
-                        )}
-                        {projects.map((project) => (
-                            <option key={project.id} value={project.id}>
-                                {project.name}
-                            </option>
-                        ))}
-                    </select>
-                    {projects.length === 0 && (
-                        <p className="text-xs text-amber-600 mt-1">
-                            No projects found for your company. Please create a project first.
-                        </p>
-                    )}
+                <div className="rounded-xl border border-blue-100 bg-blue-50 px-4 py-3 text-sm text-blue-800">
+                    This inventory is global for your company and available across your projects.
                 </div>
                 <div>
                     <label className="text-sm font-bold text-gray-700 block mb-1">Product Name</label>

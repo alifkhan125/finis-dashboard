@@ -185,7 +185,7 @@ export function InventoryPage() {
     const summaryData = isSuperAdmin ? detailsData?.summary : summary;
     const projectsData = asArray<{ id: string; name: string }>(isSuperAdmin ? detailsData?.projects : projects);
 
-    const handleAddProduct = async (newItem: { projectId: string; name: string; category?: string; location?: string; currentQty?: number; minStockQty?: number; unit?: string }) => {
+    const handleAddProduct = async (newItem: { name: string; category?: string; location?: string; currentQty?: number; minStockQty?: number; unit?: string }) => {
         await createItem(newItem).unwrap();
         setIsAddModalOpen(false);
     };
@@ -422,7 +422,6 @@ export function InventoryPage() {
             <AddProductModal
                 isOpen={isAddModalOpen}
                 onClose={() => setIsAddModalOpen(false)}
-                projects={projectsData}
                 onAdd={handleAddProduct}
             />
 

@@ -6,9 +6,8 @@ import { Badge } from '@/shared/components/ui/Badge';
 import { PageHeader } from '@/shared/components/ui/PageHeader';
 import { selectAuthToken, selectAuthUser } from '@/store/authSlice';
 import { useAppSelector } from '@/store/hooks';
-import { getPublicPlans, type SubscriptionPlanApi } from '../services/subscriptionApi';
+import { getMySubscription, getPublicPlans, type SubscriptionPlanApi } from '../services/subscriptionApi';
 import { StripePaymentModal } from '../components/StripePaymentModal';
-import { config } from '@/config/env';
 
 function featureText(plan: SubscriptionPlanApi) {
   return [
@@ -32,6 +31,15 @@ interface AdminSubscriptionStatus {
     name: string;
     priceMonthly?: number | null;
     priceYearly?: number | null;
+    visibility?: 'public' | 'private';
+    maxCompanies?: number | null;
+    maxProjects?: number | null;
+    maxUsers?: number | null;
+    hasGeofencing?: boolean;
+    hasAdvancedReporting?: boolean;
+    hasCustomReporting?: boolean;
+    hasWhiteLabel?: boolean;
+    supportLevel?: string | null;
   } | null;
   subscriptionStatus: string | null;
   currentPeriodStart?: string | null;
@@ -53,16 +61,21 @@ export function PublicSubscriptionPlansPage({ isDashboardView = false }: PublicS
   const [interval, setInterval] = useState<'monthly' | 'yearly'>('monthly');
   const [email, setEmail] = useState('');
 
+  const applyStatus = (status: Omit<AdminSubscriptionStatus, 'isActive'> & { isActive?: boolean }) => {
+    const isActive = status.isActive ?? (status.subscriptionStatus === 'active' && !status.isExpired);
+    setSubscriptionStatus({ ...status, isActive });
+  };
+
   const loadStatus = useCallback(async () => {
-    if (!authToken || isSuperAdmin) return;
+    if (!authToken) return;
     try {
-      const response = await fetch(`${config.apiBaseUrl}/admin/subscription/status`, {
-        headers: { Authorization: `Bearer ${authToken}` },
-      });
-      const data = await response.json();
-      if (response.ok && data?.success !== false && data?.data) {
-        setSubscriptionStatus(data.data);
-      }
+      // This endpoint supports both admin and super_admin and returns the
+      // currently authenticated user's tenant, avoiding cross-controller URL
+      // composition and preventing another tenant's plan from being shown.
+      const response = await getMySubscription(authToken);
+      const responseData = response?.data as unknown as AdminSubscriptionStatus & { data?: AdminSubscriptionStatus };
+      const status = responseData?.data ?? responseData ?? response;
+      if (status?.tenantId !== undefined) applyStatus(status);
     } catch {
       // ignore status fetch failure
     }
@@ -84,6 +97,13 @@ export function PublicSubscriptionPlansPage({ isDashboardView = false }: PublicS
   useEffect(() => {
     void loadStatus();
   }, [loadStatus]);
+
+  // Derive the cards from both responses so a later public-plan response cannot
+  // overwrite an active private plan that was loaded with the subscription.
+  const currentPlan = subscriptionStatus?.isActive ? subscriptionStatus.plan : null;
+  const displayedPlans = currentPlan && !plans.some((plan) => plan.id === currentPlan.id)
+    ? [...plans, currentPlan as SubscriptionPlanApi]
+    : plans;
 
   const openBuyModal = (plan: SubscriptionPlanApi, nextInterval: 'monthly' | 'yearly') => {
     if (!isSuperAdmin && subscriptionStatus?.subscriptionStatus === 'active' && !subscriptionStatus.isExpired) {
@@ -117,7 +137,7 @@ export function PublicSubscriptionPlansPage({ isDashboardView = false }: PublicS
           </div>
         ) : (
           <div className="space-y-6">
-            {!isSuperAdmin && subscriptionStatus?.isActive && subscriptionStatus?.plan && (
+            {subscriptionStatus?.isActive && subscriptionStatus?.plan && (
               <div className="rounded-[24px] border border-emerald-200/80 bg-gradient-to-r from-emerald-50/90 via-emerald-50/40 to-white p-6 shadow-sm">
                 <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
                   <div className="flex items-center gap-4">
@@ -127,8 +147,8 @@ export function PublicSubscriptionPlansPage({ isDashboardView = false }: PublicS
                     <div>
                       <div className="flex items-center gap-2.5">
                         <h3 className="text-xl font-black text-gray-900">{subscriptionStatus.plan.name} Plan</h3>
-                        <Badge className="bg-emerald-600 hover:bg-emerald-600 text-white text-xs px-2.5 py-0.5 rounded-full uppercase tracking-wider font-bold">
-                          Active
+                          <Badge className="bg-emerald-600 hover:bg-emerald-600 text-white text-xs px-2.5 py-0.5 rounded-full uppercase tracking-wider font-bold">
+                          Current Plan
                         </Badge>
                       </div>
                       <p className="text-xs text-gray-500 font-medium mt-1">
@@ -155,7 +175,7 @@ export function PublicSubscriptionPlansPage({ isDashboardView = false }: PublicS
               </div>
             )}
 
-            {plans.length === 0 ? (
+            {displayedPlans.length === 0 ? (
               <div className="flex flex-col items-center justify-center min-h-[260px] rounded-2xl border border-dashed border-gray-200 bg-white p-10 text-center shadow-sm">
                 <CreditCard className="h-10 w-10 text-gray-300 mb-3" />
                 <h3 className="text-base font-bold text-gray-900">No Subscription Plans Available</h3>
@@ -163,11 +183,11 @@ export function PublicSubscriptionPlansPage({ isDashboardView = false }: PublicS
               </div>
             ) : (
               <div className="grid gap-6 md:grid-cols-2 lg:grid-cols-3">
-                {plans.map((plan, index) => {
+                {displayedPlans.map((plan, index) => {
                   const isCurrentPlan = Boolean(
-                    !isSuperAdmin &&
                     subscriptionStatus?.isActive &&
-                    subscriptionStatus?.plan?.id === plan.id
+                    (subscriptionStatus?.plan?.id === plan.id ||
+                      subscriptionStatus?.plan?.name?.trim().toLowerCase() === plan.name.trim().toLowerCase())
                   );
 
                   return (
@@ -247,7 +267,7 @@ export function PublicSubscriptionPlansPage({ isDashboardView = false }: PublicS
                       <div className="mt-6 pt-2">
                         {isCurrentPlan ? (
                           <div className="rounded-xl bg-emerald-50 border border-emerald-200 py-2.5 text-center text-xs font-bold text-emerald-700">
-                            Active Subscription
+                            Current Plan
                           </div>
                         ) : (
                           <div className="grid grid-cols-2 gap-3">

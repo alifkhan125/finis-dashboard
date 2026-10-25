@@ -1,11 +1,11 @@
-import { useEffect, useState, useRef } from 'react';
+import { useState, useRef } from 'react';
 import { Modal } from '@/shared/components/ui/Modal';
 import { Input } from '@/shared/components/ui/Input';
 import { Button } from '@/shared/components/ui/Button';
 import { Select } from '@/shared/components/ui/Select';
 import { Camera, Building2, Globe, Mail, Phone, MapPin } from 'lucide-react';
 import { Company } from '@/shared/types';
-import { useCreateCompanyMutation, useGetAdminsQuery, useUpdateCompanyMutation } from '@/store/companiesApi';
+import { useCreateCompanyMutation, useUpdateCompanyMutation } from '@/store/companiesApi';
 import { useMeQuery } from '@/store/authApi';
 
 interface CreateCompanyModalProps {
@@ -32,22 +32,10 @@ export function CreateCompanyModal({ isOpen, onClose, onCreateCompany }: CreateC
   const [createCompanyMutation, { isLoading: isCreating }] = useCreateCompanyMutation();
   const [updateCompanyMutation] = useUpdateCompanyMutation();
   const { data: me } = useMeQuery();
-  const isSuperAdmin = me?.role === 'super_admin';
-  const { data: admins } = useGetAdminsQuery({ role: 'admin' }, {
-    skip: !isOpen || !isSuperAdmin,
-  });
-
   const [formData, setFormData] = useState(EMPTY_FORM);
   const [logoFile, setLogoFile] = useState<File | null>(null);
-  const [ownerId, setOwnerId] = useState<string | undefined>(undefined);
   const [errors, setErrors] = useState<{ name?: string; ownerId?: string; server?: string }>({});
   const fileInputRef = useRef<HTMLInputElement | null>(null);
-
-  useEffect(() => {
-    if (!ownerId && me?.id) {
-      setOwnerId(me.id);
-    }
-  }, [me?.id, ownerId]);
 
   // ── Helpers ──────────────────────────────────────────────────────────
   const set = (field: keyof typeof EMPTY_FORM) =>
@@ -62,7 +50,6 @@ export function CreateCompanyModal({ isOpen, onClose, onCreateCompany }: CreateC
     };
 
   const resolveOwnerId = (): string | undefined => {
-    if (ownerId) return ownerId;
     if (me?.id) return me.id;
     return undefined;
   };
@@ -111,7 +98,6 @@ export function CreateCompanyModal({ isOpen, onClose, onCreateCompany }: CreateC
   const resetAndClose = () => {
     setFormData(EMPTY_FORM);
     setLogoFile(null);
-    setOwnerId(undefined);
     setErrors({});
     onClose();
   };
@@ -233,20 +219,8 @@ export function CreateCompanyModal({ isOpen, onClose, onCreateCompany }: CreateC
                         },
                       ]
                     : []),
-                  ...(isSuperAdmin && admins
-                    ? admins
-                        .filter((a) => a.id !== me?.id)
-                        .map((a) => ({
-                          label: `${a.fullName} — ${a.email} (${a.role === 'super_admin' ? 'Super Admin' : 'Admin'})`,
-                          value: a.id,
-                        }))
-                    : []),
                 ]}
-                value={ownerId ?? me?.id ?? ''}
-                onChange={(e) => {
-                  setOwnerId(e.target.value || undefined);
-                  setErrors((s) => ({ ...s, ownerId: undefined }));
-                }}
+                value={me?.id ?? ''}
                 className={`h-12 rounded-xl text-sm font-medium w-full ${errors.ownerId ? 'border-red-400' : 'border-gray-200'}`}
               />
               {errors.ownerId && <p className="text-xs text-red-600 font-medium">{errors.ownerId}</p>}
