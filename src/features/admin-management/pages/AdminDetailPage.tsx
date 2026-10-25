@@ -3,7 +3,7 @@ import { ArrowLeft, Mail, Phone, Calendar, Activity, Building2 } from 'lucide-re
 import { Card } from '@/shared/components/ui/Card';
 import { Button } from '@/shared/components/ui/Button';
 import { Badge } from '@/shared/components/ui/Badge';
-import { getStatusColor } from '@/shared/utils';
+import { getStatusColor, formatRole, formatStatus, cn } from '@/shared/utils';
 import {
     useGetAdminDetailQuery,
     useUpdateUserStatusMutation,
@@ -102,10 +102,10 @@ export function AdminDetailPage() {
 
                     <div className="flex-1">
                         <div className="flex items-center gap-3 mb-2">
-                            <h1 className="text-3xl font-bold text-gray-900">{admin.fullName}</h1>
-                            <Badge className={getStatusColor(admin.status)}>{admin.status}</Badge>
-                            <Badge variant={admin.role === 'super_admin' ? 'default' : 'secondary'}>
-                                {admin.role.replace('_', ' ')}
+                            <h1 className="text-3xl font-bold text-gray-900 capitalize">{admin.fullName}</h1>
+                            <Badge className={cn(getStatusColor(admin.status), 'capitalize')}>{formatStatus(admin.status)}</Badge>
+                            <Badge variant={admin.role === 'super_admin' ? 'default' : 'secondary'} className="capitalize">
+                                {formatRole(admin.role)}
                             </Badge>
                         </div>
 
@@ -172,12 +172,12 @@ export function AdminDetailPage() {
                     <div className="space-y-3">
                         <div>
                             <div className="text-sm text-gray-500">Account Status</div>
-                            <div className="font-medium capitalize">{admin.status}</div>
+                            <div className="font-medium capitalize">{formatStatus(admin.status)}</div>
                         </div>
                         <div>
                             <div className="text-sm text-gray-500">Role</div>
                             <div className="font-medium capitalize">
-                                {admin.role.replace('_', ' ')}
+                                {formatRole(admin.role)}
                             </div>
                         </div>
                         {admin.department && (

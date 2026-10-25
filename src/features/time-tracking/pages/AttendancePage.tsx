@@ -9,6 +9,7 @@ import { Select } from '@/shared/components/ui/Select';
 import { Button } from '@/shared/components/ui/Button';
 import { useGetAttendanceRecordsQuery, useGetAttendanceSummaryQuery } from '@/store/dashboardApi';
 import type { SuperAdminAttendanceRecord } from '@/shared/types';
+import { formatStatus } from '@/shared/utils';
 
 export function AttendancePage() {
     const today = new Date();
@@ -131,8 +132,8 @@ export function AttendancePage() {
                     half_day: 'secondary'
                 };
                 return (
-                    <Badge variant={variants[record.status] || 'secondary'} className="font-black text-[10px] uppercase tracking-wider px-2 py-0.5">
-                        {record.status}
+                    <Badge variant={variants[record.status] || 'secondary'} className="font-bold text-[10px] capitalize tracking-wide px-2 py-0.5">
+                        {formatStatus(record.status)}
                     </Badge>
                 );
             }

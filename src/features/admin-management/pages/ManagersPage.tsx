@@ -9,7 +9,7 @@ import { Badge } from '@/shared/components/ui/Badge';
 import { Table, Column } from '@/shared/components/ui/Table';
 import { Select } from '@/shared/components/ui/Select';
 import { Modal } from '@/shared/components/ui/Modal';
-import { getStatusColor } from '@/shared/utils';
+import { getStatusColor, formatStatus, cn } from '@/shared/utils';
 import {
     useGetManagerStatsQuery,
     useGetManagerListQuery,
@@ -230,7 +230,7 @@ function ManagerTable({
                         </div>
                     )}
                     <div>
-                        <div className="font-medium text-gray-900">{row.fullName}</div>
+                        <div className="font-medium text-gray-900 capitalize">{row.fullName}</div>
                         <div className="text-sm text-gray-500">{row.email}</div>
                     </div>
                 </div>
@@ -269,7 +269,7 @@ function ManagerTable({
             key: 'status',
             header: 'Status',
             render: (row) => (
-                <Badge className={getStatusColor(row.status)}>{row.status}</Badge>
+                <Badge className={cn(getStatusColor(row.status), 'capitalize')}>{formatStatus(row.status)}</Badge>
             ),
         },
         {

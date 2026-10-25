@@ -1304,7 +1304,8 @@ export function QuoteLibraryPage() {
     if (!builderInfo.unitStart || !builderInfo.unitEnd) return [];
     const count = Math.max(0, Number(builderInfo.unitEnd) - Number(builderInfo.unitStart) + 1);
     const floorOffset = floor - Number(builderInfo.floorStart || plannedFloorNumbers[0] || 1);
-    return Array.from({ length: count }, (_, index) => String(Number(builderInfo.unitStart) + floorOffset * 100 + index));
+    const unitIncrement = String(Number(builderInfo.unitStart)).length >= 4 ? 1000 : 100;
+    return Array.from({ length: count }, (_, index) => String(Number(builderInfo.unitStart) + floorOffset * unitIncrement + index));
   };
 
   return (
@@ -1411,11 +1412,11 @@ export function QuoteLibraryPage() {
                   </div>
                   <div className="space-y-2">
                     <FieldLabel>Project Name *</FieldLabel>
-                    <Input value={builderInfo.projectName} onChange={(e) => setBuilderField('projectName', e.target.value)} placeholder="Enter project name" />
+                    <Input className="capitalize" value={builderInfo.projectName} onChange={(e) => setBuilderField('projectName', e.target.value)} placeholder="Enter project name" />
                   </div>
                   <div className="space-y-2">
                     <FieldLabel>Client Name *</FieldLabel>
-                    <Input value={builderInfo.clientName} onChange={(e) => setBuilderField('clientName', e.target.value)} placeholder="Enter client name" />
+                    <Input className="capitalize" value={builderInfo.clientName} onChange={(e) => setBuilderField('clientName', e.target.value)} placeholder="Enter client name" />
                   </div>
                   <div className="space-y-2">
                     <FieldLabel>Project Address *</FieldLabel>
@@ -1478,22 +1479,26 @@ export function QuoteLibraryPage() {
                       <Input type="date" value={builderInfo.endDate} onChange={(e) => setBuilderField('endDate', e.target.value)} />
                     </div>
                   </div>
-                  <div className="grid grid-cols-2 gap-4 md:grid-cols-4">
-                    <div className="space-y-2">
-                      <FieldLabel className="whitespace-nowrap">Floor Start</FieldLabel>
-                      <Input type="number" min="1" value={builderInfo.floorStart} onChange={(e) => setBuilderField('floorStart', e.target.value)} placeholder="e.g. 1" />
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <FieldLabel>Floor Start</FieldLabel>
+                        <Input type="number" min="1" value={builderInfo.floorStart} onChange={(e) => setBuilderField('floorStart', e.target.value)} placeholder="e.g. 1" />
+                      </div>
+                      <div className="space-y-2">
+                        <FieldLabel>Floor End</FieldLabel>
+                        <Input type="number" min="1" value={builderInfo.floorEnd} onChange={(e) => setBuilderField('floorEnd', e.target.value)} placeholder="e.g. 4" />
+                      </div>
                     </div>
-                    <div className="space-y-2">
-                      <FieldLabel className="whitespace-nowrap">Floor End</FieldLabel>
-                      <Input type="number" min="1" value={builderInfo.floorEnd} onChange={(e) => setBuilderField('floorEnd', e.target.value)} placeholder="e.g. 4" />
-                    </div>
-                    <div className="space-y-2">
-                      <FieldLabel className="whitespace-nowrap">Unit Start</FieldLabel>
-                      <Input type="number" min="1" value={builderInfo.unitStart} onChange={(e) => setBuilderField('unitStart', e.target.value)} placeholder="e.g. 101" />
-                    </div>
-                    <div className="space-y-2">
-                      <FieldLabel className="whitespace-nowrap">Unit End</FieldLabel>
-                      <Input type="number" min="1" value={builderInfo.unitEnd} onChange={(e) => setBuilderField('unitEnd', e.target.value)} placeholder="e.g. 103" />
+                    <div className="grid grid-cols-2 gap-4">
+                      <div className="space-y-2">
+                        <FieldLabel>Unit Start</FieldLabel>
+                        <Input type="number" min="1" value={builderInfo.unitStart} onChange={(e) => setBuilderField('unitStart', e.target.value)} placeholder="e.g. 101 or 1001" />
+                      </div>
+                      <div className="space-y-2">
+                        <FieldLabel>Unit End</FieldLabel>
+                        <Input type="number" min="1" value={builderInfo.unitEnd} onChange={(e) => setBuilderField('unitEnd', e.target.value)} placeholder="e.g. 103 or 1003" />
+                      </div>
                     </div>
                   </div>
                   <Button

@@ -8,7 +8,7 @@ import { Badge } from '@/shared/components/ui/Badge';
 import { Table } from '@/shared/components/ui/Table';
 import { Modal } from '@/shared/components/ui/Modal';
 import { Select } from '@/shared/components/ui/Select';
-import { getStatusColor } from '@/shared/utils';
+import { getStatusColor, formatRole, formatStatus, cn } from '@/shared/utils';
 import { useNavigate } from 'react-router-dom';
 import { Column } from '@/shared/components/ui/Table';
 import {
@@ -234,7 +234,7 @@ function AdminTable({
                         </div>
                     )}
                     <div>
-                        <div className="font-medium text-gray-900">{row.fullName}</div>
+                        <div className="font-medium text-gray-900 capitalize">{row.fullName}</div>
                         <div className="text-sm text-gray-500">{row.email}</div>
                     </div>
                 </div>
@@ -244,8 +244,8 @@ function AdminTable({
             key: 'role',
             header: 'Role',
             render: (row) => (
-                <Badge variant={row.role === 'admin' ? 'default' : 'secondary'}>
-                    {row.role.replace('_', ' ')}
+                <Badge variant={row.role === 'admin' ? 'default' : 'secondary'} className="capitalize">
+                    {formatRole(row.role)}
                 </Badge>
             ),
         },
@@ -271,7 +271,7 @@ function AdminTable({
             key: 'status',
             header: 'Status',
             render: (row) => (
-                <Badge className={getStatusColor(row.status)}>{row.status}</Badge>
+                <Badge className={cn(getStatusColor(row.status), 'capitalize')}>{formatStatus(row.status)}</Badge>
             ),
         },
         {

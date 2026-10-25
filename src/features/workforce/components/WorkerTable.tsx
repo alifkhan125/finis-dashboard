@@ -4,7 +4,7 @@ import { Table, Column } from '@/shared/components/ui/Table';
 import { Badge } from '@/shared/components/ui/Badge';
 import { Avatar, AvatarFallback, AvatarImage } from '@/shared/components/ui/Avatar';
 
-import { formatCurrency } from '@/shared/utils';
+import { formatCurrency, formatRole, formatStatus } from '@/shared/utils';
 
 interface WorkerTableProps {
   data: any[];
@@ -39,12 +39,12 @@ export function WorkerTable({ data }: WorkerTableProps) {
           </div>
           <div className="space-y-0.5">
             <div className="flex items-center gap-1.5">
-              <p className="font-bold text-gray-900 leading-tight hover:text-[#1D4F6D] transition-colors">{row.fullName || row.name}</p>
+              <p className="font-bold text-gray-900 leading-tight hover:text-[#1D4F6D] transition-colors capitalize">{row.fullName || row.name}</p>
               {Number(row.hourlyRate ?? 0) > 40 && <Star className="h-3 w-3 text-yellow-500 fill-yellow-500" />}
             </div>
-            <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-400 uppercase tracking-tight">
+            <div className="flex items-center gap-1.5 text-[10px] font-bold text-gray-400 capitalize tracking-tight">
               <ShieldCheck className="h-3 w-3 text-[#1D4F6D]" />
-              {row.role}
+              {formatRole(row.role)}
             </div>
           </div>
         </div>
@@ -70,8 +70,8 @@ export function WorkerTable({ data }: WorkerTableProps) {
         render: (row) => {
         const meta = getStatusMeta(row.status, row.isInsideZone);
         return (
-          <Badge variant={meta.variant} className={`font-black text-[10px] uppercase tracking-widest px-2.5 py-0.5 ${meta.badgeClass}`}>
-            {meta.label}
+          <Badge variant={meta.variant} className={`font-black text-[10px] capitalize tracking-wide px-2.5 py-0.5 ${meta.badgeClass}`}>
+            {formatStatus(meta.label)}
           </Badge>
         );
       }

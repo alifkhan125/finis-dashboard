@@ -7,6 +7,7 @@ import { Badge } from '@/shared/components/ui/Badge';
 import { Table, Column } from '@/shared/components/ui/Table';
 import { Modal } from '@/shared/components/ui/Modal';
 import { SuperAdminAttendanceRecord } from '@/shared/types';
+import { formatStatus } from '@/shared/utils';
 
 type Props = {
     attendance: SuperAdminAttendanceRecord[];
@@ -135,8 +136,8 @@ export function AttendanceView({
             key: 'status',
             header: 'Status',
             render: (record) => (
-                <Badge variant={record.status === 'present' ? 'success' : record.status === 'late' ? 'warning' : 'destructive'} className="font-bold uppercase text-[10px]">
-                    {record.status.replace('_', ' ')}
+                <Badge variant={record.status === 'present' ? 'success' : record.status === 'late' ? 'warning' : 'destructive'} className="font-bold capitalize text-[10px]">
+                    {formatStatus(record.status)}
                 </Badge>
             )
         },
@@ -349,8 +350,8 @@ export function AttendanceView({
                             </div>
                             <div className="p-3 bg-gray-50 rounded-xl space-y-1">
                                 <span className="text-[10px] font-black text-gray-400 uppercase tracking-widest block">Status</span>
-                                <Badge variant={selectedRecordDetail.status === 'present' ? 'success' : 'warning'} className="font-bold uppercase text-[9px]">
-                                    {selectedRecordDetail.status}
+                                <Badge variant={selectedRecordDetail.status === 'present' ? 'success' : 'warning'} className="font-bold capitalize text-[9px]">
+                                    {formatStatus(selectedRecordDetail.status)}
                                 </Badge>
                             </div>
                             <div className="p-3 bg-gray-50 rounded-xl space-y-1">

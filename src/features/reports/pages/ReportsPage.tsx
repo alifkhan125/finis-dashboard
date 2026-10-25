@@ -22,6 +22,7 @@ import { Select } from '@/shared/components/ui/Select';
 import { DatePicker } from '@/shared/components/ui/DatePicker';
 import { Badge } from '@/shared/components/ui/Badge';
 import { Table, Column } from '@/shared/components/ui/Table';
+import { formatStatus, capitalize } from '@/shared/utils';
 import { useDebounce } from '@/shared/hooks';
 
 type ReportType = 'payroll' | 'project_invoices' | 'worker_performance' | 'expense';
@@ -723,7 +724,7 @@ export function ReportsPage() {
         {
           key: 'status',
           header: 'Status',
-          render: (record) => <Badge variant="secondary">{record.status}</Badge>,
+          render: (record) => <Badge variant="secondary" className="capitalize">{formatStatus(record.status)}</Badge>,
         },
       ];
 
@@ -804,7 +805,7 @@ export function ReportsPage() {
       {
         key: 'category',
         header: 'Category',
-        render: (record) => <Badge variant="secondary">{record.category}</Badge>,
+        render: (record) => <Badge variant="secondary" className="capitalize">{capitalize(record.category)}</Badge>,
       },
       {
         key: 'amount',
@@ -824,8 +825,8 @@ export function ReportsPage() {
             ? 'bg-red-100 text-red-800'
             : 'bg-amber-100 text-amber-800';
           return (
-            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium uppercase tracking-wider ${colorClass}`}>
-              {record.status}
+            <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-semibold capitalize tracking-wide ${colorClass}`}>
+              {formatStatus(record.status)}
             </span>
           );
         },

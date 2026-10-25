@@ -11,6 +11,7 @@ import {
   AddWorkerModal
 } from '../components';
 import { Badge } from '@/shared/components/ui/Badge';
+import { formatRole } from '@/shared/utils';
 import { SEO } from '@/shared/components/seo/SEO';
 import { Avatar, AvatarFallback, AvatarImage } from '@/shared/components/ui/Avatar';
 import { DateRangeFilter } from '@/features/dashboard/components/DateRangeFilter';
@@ -259,7 +260,7 @@ export function WorkforcePage() {
                       <span className="font-medium text-gray-900">{invitation.phone}</span>
                     </div>
                   )}
-                  <Badge variant="secondary">{invitation.role}</Badge>
+                  <Badge variant="secondary" className="capitalize">{formatRole(invitation.role)}</Badge>
                 </div>
                 <div className="flex items-center gap-2">
                   <span className="text-sm text-gray-600">

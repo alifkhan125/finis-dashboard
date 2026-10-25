@@ -11,7 +11,7 @@ import { Modal } from '@/shared/components/ui/Modal';
 import { PageHeader } from '@/shared/components/ui/PageHeader';
 import { Avatar, AvatarFallback, AvatarImage } from '@/shared/components/ui/Avatar';
 import { apiClient, API_ENDPOINTS } from '@/services';
-import { getStatusColor } from '@/shared/utils';
+import { getStatusColor, formatStatus, capitalize, cn } from '@/shared/utils';
 
 interface ExpenseItem {
     id: string;
@@ -429,7 +429,7 @@ export function ExpensesPage() {
                                             {expense.workerName.charAt(0)}
                                         </AvatarFallback>
                                     </Avatar>
-                                    <span className="font-bold text-gray-900">{expense.workerName}</span>
+                                    <span className="font-bold text-gray-900 capitalize">{expense.workerName}</span>
                                 </div>
                             )
                         },
@@ -441,7 +441,7 @@ export function ExpensesPage() {
                         {
                             key: 'category',
                             header: 'Category',
-                            render: (expense) => <Badge variant="secondary">{expense.category}</Badge>
+                            render: (expense) => <Badge variant="secondary" className="capitalize">{capitalize(expense.category)}</Badge>
                         },
                         {
                             key: 'subtotal',
@@ -472,8 +472,8 @@ export function ExpensesPage() {
                             key: 'status',
                             header: 'Status',
                             render: (expense) => (
-                                <Badge className={getStatusColor(expense.status)}>
-                                    {expense.status}
+                                <Badge className={cn(getStatusColor(expense.status), 'capitalize')}>
+                                    {formatStatus(expense.status)}
                                 </Badge>
                             )
                         },

@@ -200,3 +200,68 @@ export function truncate(text: string, length: number): string {
     if (text.length <= length) return text;
     return text.substring(0, length) + '...';
 }
+
+/**
+ * Capitalize words in a string, replacing underscores/hyphens with spaces.
+ * e.g. "super_admin" -> "Super Admin", "in_progress" -> "In Progress"
+ */
+export function capitalize(str?: string | null): string {
+    if (!str) return '';
+    return str
+        .toString()
+        .replace(/[_-]+/g, ' ')
+        .trim()
+        .split(/\s+/)
+        .map(word => word.charAt(0).toUpperCase() + word.slice(1).toLowerCase())
+        .join(' ');
+}
+
+/**
+ * Format user role to Title Case / friendly display.
+ * e.g. "super_admin" -> "Super Admin", "admin" -> "Admin", "manager" -> "Manager", "worker" -> "Worker"
+ */
+export function formatRole(role?: string | null): string {
+    if (!role) return '';
+    const map: Record<string, string> = {
+        super_admin: 'Super Admin',
+        admin: 'Admin',
+        manager: 'Manager',
+        worker: 'Worker',
+    };
+    return map[role.toLowerCase()] || capitalize(role);
+}
+
+/**
+ * Format status code to Title Case.
+ * e.g. "active" -> "Active", "in_progress" -> "In Progress", "early_departure" -> "Early Departure"
+ */
+export function formatStatus(status?: string | null): string {
+    if (!status) return '';
+    const map: Record<string, string> = {
+        active: 'Active',
+        inactive: 'Inactive',
+        pending: 'Pending',
+        approved: 'Approved',
+        rejected: 'Rejected',
+        denied: 'Denied',
+        completed: 'Completed',
+        in_progress: 'In Progress',
+        planning: 'Planning',
+        disabled: 'Disabled',
+        present: 'Present',
+        absent: 'Absent',
+        late: 'Late',
+        early_departure: 'Early Departure',
+        paid: 'Paid',
+        unpaid: 'Unpaid',
+        overdue: 'Overdue',
+        draft: 'Draft',
+        suspended: 'Suspended',
+        trial: 'Trial',
+        cancelled: 'Cancelled',
+        inside: 'Inside',
+        outside: 'Outside',
+    };
+    return map[status.toLowerCase()] || capitalize(status);
+}
+

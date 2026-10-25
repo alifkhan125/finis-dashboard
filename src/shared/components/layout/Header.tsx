@@ -6,7 +6,7 @@ import { Avatar, AvatarFallback, AvatarImage } from '@/shared/components/ui/Avat
 import { NotificationOverlay } from './NotificationOverlay';
 import { SearchOverlay } from './SearchOverlay';
 import { Dropdown } from '@/shared/components/ui/Dropdown';
-import { cn } from '@/shared/utils';
+import { cn, formatRole } from '@/shared/utils';
 import { useNotifications } from '@/shared/hooks/useNotifications';
 import { useAppDispatch, useAppSelector } from '@/store/hooks';
 import {
@@ -279,11 +279,11 @@ export function Header({ onMenuToggle }: HeaderProps) {
             trigger={
               <button className="group flex items-center gap-3 rounded-2xl border border-gray-100 bg-[linear-gradient(135deg,rgba(255,255,255,0.88)_0%,rgba(244,248,252,0.96)_100%)] p-1.5 pl-3 transition-all hover:border-[#1D4F6D]/20 hover:bg-white hover:shadow-sm">
                 <div className="hidden text-right sm:block">
-                  <p className="text-xs font-black leading-none text-gray-900 transition-colors group-hover:text-[#1D4F6D]">
+                  <p className="text-xs font-black leading-none text-gray-900 transition-colors group-hover:text-[#1D4F6D] capitalize">
                     {authUser?.fullName ?? 'User'}
                   </p>
-                  <p className="mt-1.5 text-[10px] font-bold leading-none text-gray-400">
-                    {authUser?.role ?? 'Member'}
+                  <p className="mt-1.5 text-[10px] font-bold leading-none text-gray-400 capitalize">
+                    {formatRole(authUser?.role) || 'Member'}
                   </p>
                 </div>
                 <Avatar className="h-9 w-9 border-2 border-white shadow-sm ring-1 ring-gray-100 transition-all group-hover:ring-[#1D4F6D]/20">

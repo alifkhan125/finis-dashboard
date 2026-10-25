@@ -8,7 +8,7 @@ import { Modal } from '@/shared/components/ui/Modal';
 import { Avatar, AvatarFallback, AvatarImage } from '@/shared/components/ui/Avatar';
 import { apiClient, API_ENDPOINTS } from '@/services';
 import { TimeAdjustmentRequest } from '@/shared/types';
-import { getStatusColor } from '@/shared/utils';
+import { getStatusColor, formatStatus, capitalize, cn } from '@/shared/utils';
 
 function formatAMPM(dateOrStr?: string | Date | null): string {
     if (!dateOrStr) return '--:--';
@@ -244,8 +244,8 @@ export function TimeAdjustmentRequestsPage({ embedded = false }: { embedded?: bo
             key: 'status',
             header: 'Status',
             render: (record: TimeAdjustmentRequest) => (
-                <Badge className={getStatusColor(record.status)}>
-                    {record.status}
+                <Badge className={cn(getStatusColor(record.status), 'capitalize')}>
+                    {formatStatus(record.status)}
                 </Badge>
             )
         },
@@ -353,13 +353,13 @@ export function TimeAdjustmentRequestsPage({ embedded = false }: { embedded?: bo
                             <div>
                                 <label className="text-xs text-gray-500 uppercase tracking-wider font-bold">Type</label>
                                 <p className="mt-1">
-                                    <Badge variant="secondary">{selectedRequest.requestType.replace('_', '-')}</Badge>
+                                    <Badge variant="secondary" className="capitalize">{capitalize(selectedRequest.requestType)}</Badge>
                                 </p>
                             </div>
                             <div>
                                 <label className="text-xs text-gray-500 uppercase tracking-wider font-bold">Status</label>
                                 <p className="mt-1">
-                                    <Badge className={getStatusColor(selectedRequest.status)}>{selectedRequest.status}</Badge>
+                                    <Badge className={cn(getStatusColor(selectedRequest.status), 'capitalize')}>{formatStatus(selectedRequest.status)}</Badge>
                                 </p>
                             </div>
                         </div>

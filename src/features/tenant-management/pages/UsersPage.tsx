@@ -21,6 +21,7 @@ import { Table, Column } from '@/shared/components/ui/Table';
 import { Avatar, AvatarFallback, AvatarImage } from '@/shared/components/ui/Avatar';
 import { PageHeader } from '@/shared/components/ui/PageHeader';
 import { Modal } from '@/shared/components/ui/Modal';
+import { formatRole, formatStatus } from '@/shared/utils';
 import { useAppSelector } from '@/store/hooks';
 import { selectAuthToken } from '@/store/authSlice';
 import { assignPlanToUser, getPlans, type SubscriptionPlanApi } from '../services/subscriptionApi';
@@ -113,7 +114,7 @@ export function UsersPage() {
             </AvatarFallback>
           </Avatar>
           <div className="flex flex-col">
-            <span className="font-bold text-gray-900">{user.fullName || 'Unnamed User'}</span>
+            <span className="font-bold text-gray-900 capitalize">{user.fullName || 'Unnamed User'}</span>
             <div className="flex items-center gap-1.5 mt-0.5">
               <span className="text-xs uppercase tracking-wider text-gray-500 font-bold">
                 Admin
@@ -221,7 +222,7 @@ export function UsersPage() {
             ) : (
               <XCircle className="w-3 h-3 mr-1 text-red-600" />
             )}
-            {user.status || 'active'}
+            {formatStatus(user.status) || 'Active'}
           </Badge>
         );
       },
@@ -408,9 +409,9 @@ export function UsersPage() {
               </Avatar>
               <div className="flex-1">
                 <div className="flex items-center justify-between">
-                  <h3 className="text-lg font-bold text-gray-900">{selectedUser.fullName}</h3>
+                  <h3 className="text-lg font-bold text-gray-900 capitalize">{selectedUser.fullName}</h3>
                   <Badge className="capitalize font-semibold">
-                    {selectedUser.role === 'super_admin' ? 'Admin (Super Admin)' : 'Admin'}
+                    {selectedUser.role === 'super_admin' ? 'Admin (Super Admin)' : formatRole(selectedUser.role) || 'Admin'}
                   </Badge>
                 </div>
                 <p className="text-xs text-gray-500 mt-0.5">{selectedUser.email}</p>
@@ -515,7 +516,7 @@ export function UsersPage() {
               </div>
               <div className="flex items-center justify-between py-1 border-b border-gray-100">
                 <span className="text-gray-500">Status</span>
-                <span className="font-bold capitalize text-emerald-600">{selectedUser.status}</span>
+                <span className="font-bold capitalize text-emerald-600">{formatStatus(selectedUser.status)}</span>
               </div>
               <div className="flex items-center justify-between py-1 border-b border-gray-100">
                 <span className="text-gray-500">Created At</span>

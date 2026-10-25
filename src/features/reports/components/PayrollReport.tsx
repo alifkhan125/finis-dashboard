@@ -5,6 +5,7 @@ import { Table, Column } from '@/shared/components/ui/Table';
 import { Badge } from '@/shared/components/ui/Badge';
 import { Button } from '@/shared/components/ui/Button';
 import { Modal } from '@/shared/components/ui/Modal';
+import { formatStatus } from '@/shared/utils';
 import { config } from '@/config/env';
 import { selectAuthToken } from '@/store/authSlice';
 import { useAppSelector } from '@/store/hooks';
@@ -173,7 +174,7 @@ export function PayrollReport() {
     {
       key: 'status',
       header: 'Status',
-      render: (record) => <Badge variant={record.status === 'approved' ? 'success' : record.status === 'paid' ? 'default' : 'secondary'}>{record.status}</Badge>,
+      render: (record) => <Badge variant={record.status === 'approved' ? 'success' : record.status === 'paid' ? 'default' : 'secondary'} className="capitalize">{formatStatus(record.status)}</Badge>,
     },
     {
       key: 'actions',

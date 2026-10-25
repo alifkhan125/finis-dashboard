@@ -10,7 +10,7 @@ import { Badge } from '@/shared/components/ui/Badge';
 import { Tabs } from '@/shared/components/ui/Tabs';
 import { Avatar, AvatarFallback, AvatarImage } from '@/shared/components/ui/Avatar';
 import { Card, CardContent, CardHeader, CardTitle } from '@/shared/components/ui/Card';
-import { getStatusColor } from '@/shared/utils';
+import { getStatusColor, formatStatus, cn } from '@/shared/utils';
 import {
     useGetAdminDetailQuery,
     useUpdateUserStatusMutation,
@@ -107,9 +107,9 @@ export function ManagerDetailPage() {
                             </div>
                             <div className="space-y-2 mb-2">
                                 <div className="flex items-center gap-3">
-                                    <h1 className="text-3xl font-black text-gray-900 tracking-tight">{manager.fullName}</h1>
-                                    <Badge className={`${getStatusColor(manager.status)} font-bold px-3 py-1`}>
-                                        {manager.status.toUpperCase()}
+                                    <h1 className="text-3xl font-black text-gray-900 tracking-tight capitalize">{manager.fullName}</h1>
+                                    <Badge className={cn(getStatusColor(manager.status), 'font-bold px-3 py-1 capitalize')}>
+                                        {formatStatus(manager.status)}
                                     </Badge>
                                 </div>
                                 <div className="flex flex-wrap items-center gap-5 text-sm font-bold text-gray-500">

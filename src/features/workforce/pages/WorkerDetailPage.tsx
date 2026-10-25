@@ -14,7 +14,7 @@ import {
   MessageWorkerModal,
   EditWorkerProfileModal
 } from '../components';
-import { formatDate } from '@/shared/utils';
+import { formatDate, formatRole, formatStatus } from '@/shared/utils';
 import { useAppSelector } from '@/store/hooks';
 import { apiClient } from '@/services';
 
@@ -143,15 +143,15 @@ export function WorkerDetailPage() {
               </div>
               <div className="space-y-2 mb-2">
                 <div className="flex items-center gap-3">
-                  <h1 className="text-3xl font-black text-gray-900 tracking-tight">{worker.name}</h1>
-                  <Badge variant={worker.status === 'active' ? 'success' : 'secondary'} className="font-bold px-3 py-1">
-                    {worker.status.toUpperCase()}
+                  <h1 className="text-3xl font-black text-gray-900 tracking-tight capitalize">{worker.name}</h1>
+                  <Badge variant={worker.status === 'active' ? 'success' : 'secondary'} className="font-bold px-3 py-1 capitalize">
+                    {formatStatus(worker.status)}
                   </Badge>
                 </div>
                 <div className="flex flex-wrap items-center gap-5 text-sm font-bold text-gray-500">
                   <div className="flex items-center gap-1.5 px-3 py-1 bg-gray-50 rounded-lg">
                     <ShieldCheck className="h-4 w-4 text-[#1D4F6D]" />
-                    {worker.role}
+                    <span className="capitalize">{formatRole(worker.role)}</span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <MapPin className="h-4 w-4 text-gray-400" />
@@ -218,7 +218,7 @@ export function WorkerDetailPage() {
                     </div>
                     <div className="space-y-1.5">
                       <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Employment Role</p>
-                      <p className="font-bold text-gray-900 text-lg">{worker.role}</p>
+                      <p className="font-bold text-gray-900 text-lg capitalize">{formatRole(worker.role)}</p>
                     </div>
                     <div className="space-y-1.5">
                       <p className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Hourly Compensation</p>
@@ -308,7 +308,7 @@ export function WorkerDetailPage() {
                               <p className="text-[10px] font-bold text-gray-400 uppercase">Expires: {cert.expiresAt ? formatDate(cert.expiresAt) : 'N/A'}</p>
                             </div>
                           </div>
-                          <Badge variant={cert.status === 'active' ? 'success' : 'secondary'} className="font-bold">{cert.status?.toUpperCase() || 'ACTIVE'}</Badge>
+                          <Badge variant={cert.status === 'active' ? 'success' : 'secondary'} className="font-bold capitalize">{formatStatus(cert.status) || 'Active'}</Badge>
                         </div>
                       ))
                     ) : (

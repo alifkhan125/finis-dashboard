@@ -15,7 +15,7 @@ import { config } from '@/config/env';
 
 const menuItems = [
   {
-    section: 'MAIN MENU',
+    section: 'Main Menu',
     items: [
       { icon: LayoutDashboard, label: 'Dashboard', path: '/' },
       { icon: Users, label: 'Companies', path: '/companies' },
@@ -23,7 +23,7 @@ const menuItems = [
     ]
   },
   {
-    section: 'TEAM MANAGEMENT',
+    section: 'Team Management',
     items: [
       { icon: UserCog, label: 'Admins', path: '/admins' },
       { icon: Users, label: 'Managers', path: '/managers' },
@@ -31,7 +31,7 @@ const menuItems = [
     ]
   },
   {
-    section: 'TIME & PAYROLL',
+    section: 'Time & Payroll',
     items: [
       { icon: Clock, label: 'Time Tracking', path: '/time-tracking' },
       { icon: MapPin, label: 'Geofencing', path: '/geofencing' },
@@ -39,7 +39,7 @@ const menuItems = [
     ]
   },
   {
-    section: 'FINANCIAL',
+    section: 'Financial',
     items: [
       { icon: FileBarChart, label: 'Reports', path: '/reports' },
       { icon: ScrollText, label: 'Quotes Library', path: '/quotes' },
@@ -47,14 +47,14 @@ const menuItems = [
     ]
   },
   {
-    section: 'TOOLS',
+    section: 'Tools',
     items: [
       { icon: Package, label: 'Inventory', path: '/inventory' },
       { icon: MessageSquare, label: 'Messages', path: '/chat' }
     ]
   },
   {
-    section: 'SAAS MANAGEMENT',
+    section: 'SaaS Management',
     items: [
       { icon: Users, label: 'Users', path: '/users' },
       { icon: Building, label: 'Tenants', path: '/tenants' },
@@ -110,8 +110,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           return item;
         });
 
-      const sectionTitle = (!isSuperAdmin && section.section === 'SAAS MANAGEMENT')
-        ? 'SUBSCRIPTION'
+      const sectionTitle = (!isSuperAdmin && (section.section === 'SaaS Management' || section.section === 'SAAS MANAGEMENT'))
+        ? 'Subscription'
         : section.section;
 
       return {
@@ -170,7 +170,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     {/* Navigation */}
     <div className="flex-1 overflow-y-auto px-4 py-6 space-y-8">
       {filteredMenuItems.map(section => <div key={section.section}>
-        <h3 className="mb-4 px-4 text-xs font-semibold uppercase tracking-wider text-gray-400">
+        <h3 className="mb-4 px-4 text-xs font-semibold capitalize tracking-wider text-gray-400">
           {section.section}
         </h3>
         <div className="space-y-1">
@@ -192,8 +192,8 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
 
       {/* Others Section */}
       <div>
-        <h3 className="mb-4 px-4 text-xs font-semibold uppercase tracking-wider text-gray-400">
-          OTHERS
+        <h3 className="mb-4 px-4 text-xs font-semibold capitalize tracking-wider text-gray-400">
+          Others
         </h3>
         <div className="space-y-1">
           <button
@@ -265,7 +265,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
           </AvatarFallback>
         </Avatar>
         <div className="flex-1 overflow-hidden">
-          <p className="truncate text-sm font-semibold text-gray-900">
+          <p className="truncate text-sm font-semibold text-gray-900 capitalize">
             {authUser?.fullName ?? 'User'}
           </p>
           <p className="truncate text-xs text-gray-500">{authUser?.email ?? 'No email'}</p>

@@ -20,7 +20,7 @@ import { Badge } from '@/shared/components/ui/Badge';
 import { Table } from '@/shared/components/ui/Table';
 import { Select } from '@/shared/components/ui/Select';
 import { Avatar, AvatarFallback, AvatarImage } from '@/shared/components/ui/Avatar';
-import { getFullUrl } from '@/shared/utils';
+import { getFullUrl, formatStatus, capitalize, cn } from '@/shared/utils';
 import { PageHeader } from '@/shared/components/ui/PageHeader';
 import { TenantBrandingModal } from '@/shared/components/layout/TenantBrandingModal';
 import { useAppSelector } from '@/store/hooks';
@@ -511,7 +511,7 @@ export function TenantsPage() {
                 <div className="space-y-1">
                   <Badge variant="default">{tenant.plan?.name ?? 'N/A'}</Badge>
                   <div className="text-[11px] text-gray-500">
-                    {tenant.subscription?.planInterval ?? '—'} · {formatMoney(tenant.subscription?.billedAmount ?? tenant.plan?.priceMonthly)}
+                    {capitalize(tenant.subscription?.planInterval) || '—'} · {formatMoney(tenant.subscription?.billedAmount ?? tenant.plan?.priceMonthly)}
                   </div>
                 </div>
               ),
@@ -519,7 +519,7 @@ export function TenantsPage() {
             {
               key: 'status',
               header: 'Status',
-              render: (tenant) => <Badge className={statusClass(tenant.subscription?.status)}>{tenant.subscription?.status ?? 'none'}</Badge>,
+              render: (tenant) => <Badge className={cn(statusClass(tenant.subscription?.status), 'capitalize')}>{formatStatus(tenant.subscription?.status) || 'None'}</Badge>,
             },
             {
               key: 'billing',

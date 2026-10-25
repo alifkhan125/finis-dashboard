@@ -3,6 +3,7 @@ import { Table, Column } from '@/shared/components/ui/Table';
 import { Badge } from '@/shared/components/ui/Badge';
 import { Button } from '@/shared/components/ui/Button';
 import { Download } from 'lucide-react';
+import { formatStatus } from '@/shared/utils';
 
 interface InvoiceRecord {
     id: string;
@@ -63,8 +64,8 @@ export function InvoiceReport() {
             key: 'status',
             header: 'Status',
             render: (record) => (
-                <Badge variant={record.status === 'paid' ? 'success' : record.status === 'overdue' ? 'destructive' : 'secondary'}>
-                    {record.status}
+                <Badge variant={record.status === 'paid' ? 'success' : record.status === 'overdue' ? 'destructive' : 'secondary'} className="capitalize">
+                    {formatStatus(record.status)}
                 </Badge>
             )
         },
