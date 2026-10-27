@@ -163,6 +163,10 @@ export interface QuoteEstimate {
   discountAmount: number;
   taxAmount: number;
   totalAmount: number;
+  schemaVersion?: number;
+  quotationDetails?: unknown[] | null;
+  buildingPlan?: Record<string, unknown> | null;
+  pricingConfig?: Record<string, unknown> | null;
   status: QuoteEstimateStatus;
   sentAt?: string | null;
   acceptedAt?: string | null;
@@ -227,6 +231,10 @@ export interface CreateQuoteEstimatePayload {
   discountAmount?: number;
   taxAmount?: number;
   tasks?: CreateQuoteEstimateTaskPayload[];
+  schemaVersion?: number;
+  quotationDetails?: unknown[];
+  buildingPlan?: Record<string, unknown>;
+  pricingConfig?: Record<string, unknown>;
 }
 
 export type UpdateQuoteEstimatePayload = Partial<CreateQuoteEstimatePayload> & {
@@ -550,6 +558,14 @@ export const quotesApi = createApi({
       },
       providesTags: ['QuoteEstimates'],
     }),
+    getQuoteEstimate: builder.query<QuoteEstimate, string>({
+      query: (id) => API_ENDPOINTS.QUOTE_ESTIMATES.DETAIL(id),
+      transformResponse: (response: ApiEnvelope<QuoteEstimate> | QuoteEstimate): QuoteEstimate => {
+        if (response && typeof response === 'object' && 'data' in response) return response.data;
+        return response as QuoteEstimate;
+      },
+      providesTags: ['QuoteEstimates'],
+    }),
     createQuoteEstimate: builder.mutation<{ message: string; quote: QuoteEstimate }, CreateQuoteEstimatePayload>({
       query: (body) => ({
         url: API_ENDPOINTS.QUOTE_ESTIMATES.CREATE,
@@ -596,6 +612,21 @@ export const quotesApi = createApi({
       }),
       invalidatesTags: ['QuoteEstimates'],
     }),
+    rejectQuoteEstimate: builder.mutation<{ message: string; quote: QuoteEstimate }, { id: string; notes?: string }>({
+      query: ({ id, ...body }) => ({
+        url: API_ENDPOINTS.QUOTE_ESTIMATES.REJECT(id),
+        method: 'POST',
+        body,
+      }),
+      invalidatesTags: ['QuoteEstimates'],
+    }),
+    cancelQuoteEstimate: builder.mutation<{ message: string; quote: QuoteEstimate }, string>({
+      query: (id) => ({
+        url: API_ENDPOINTS.QUOTE_ESTIMATES.CANCEL(id),
+        method: 'POST',
+      }),
+      invalidatesTags: ['QuoteEstimates'],
+    }),
     convertQuoteEstimateToProject: builder.mutation<{ message: string; quote: QuoteEstimate; project: { id: string; name: string } }, string>({
       query: (id) => ({
         url: API_ENDPOINTS.QUOTE_ESTIMATES.CONVERT_TO_PROJECT(id),
@@ -636,11 +667,14 @@ export const {
   useUpdateQuoteMutation,
   useDeleteQuoteMutation,
   useGetQuoteEstimatesQuery,
+  useGetQuoteEstimateQuery,
   useCreateQuoteEstimateMutation,
   useUpdateQuoteEstimateMutation,
   useDeleteQuoteEstimateMutation,
   useSendQuoteEstimateMutation,
   useAcceptQuoteEstimateMutation,
+  useRejectQuoteEstimateMutation,
+  useCancelQuoteEstimateMutation,
   useConvertQuoteEstimateToProjectMutation,
   useAcceptAndCreateQuoteEstimateProjectMutation,
 } = quotesApi;

@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import "./quotation-v2.css";
-import { Navigate } from "react-router-dom";
+import { Navigate, useNavigate } from "react-router-dom";
 import {
   ArrowLeft,
   ArrowRight,
+  Archive,
   Building2,
   CheckCircle2,
+  CircleOff,
   FileText,
   FileEdit,
   Download,
@@ -31,6 +33,19 @@ import { Button } from "@/shared/components/ui/Button";
 import { Modal } from "@/shared/components/ui/Modal";
 import { SEO } from "@/shared/components/seo/SEO";
 import { config } from "@/config/env";
+import { useGetCompaniesQuery } from "@/store/companiesApi";
+import {
+  type CreateQuoteEstimatePayload,
+  type QuoteEstimate,
+  useAcceptAndCreateQuoteEstimateProjectMutation,
+  useCreateQuoteEstimateMutation,
+  useCancelQuoteEstimateMutation,
+  useDeleteQuoteEstimateMutation,
+  useGetQuoteEstimatesQuery,
+  useRejectQuoteEstimateMutation,
+  useSendQuoteEstimateMutation,
+  useUpdateQuoteEstimateMutation,
+} from "@/store/quotesApi";
 import {
   QuotationDetailsEditor,
   QuotationDetailsPreview,
@@ -74,6 +89,7 @@ const steps = [
   "Full Quotation View",
 ];
 const uid = () => crypto.randomUUID();
+const locationToken = (value: string) => value.trim().toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
 const money = (n: number) =>
   new Intl.NumberFormat("en-US", { style: "currency", currency: "USD" }).format(
     n,
@@ -167,31 +183,149 @@ function Choice({
 export function QuoteLibraryV2Page() {
   const user = useAppSelector(selectAuthUser);
   if (user?.role !== "admin") return <Navigate to="/" replace />;
-  return <QuotationBuilder />;
+  return <QuotationWorkspace />;
 }
-function QuotationBuilder() {
+
+function QuotationWorkspace() {
+  const navigate = useNavigate();
+  const [showSaved, setShowSaved] = useState(false);
+  const [selectedQuote, setSelectedQuote] = useState<QuoteEstimate | null>(null);
+  const { data, isLoading } = useGetQuoteEstimatesQuery({ limit: 100 });
+  const savedQuotes = Array.isArray(data?.data) ? data.data : [];
+  const [deleteQuote, { isLoading: isDeleting }] = useDeleteQuoteEstimateMutation();
+  const [rejectQuote, { isLoading: isRejecting }] = useRejectQuoteEstimateMutation();
+  const [cancelQuote, { isLoading: isCancelling }] = useCancelQuoteEstimateMutation();
+
+  if (showSaved) {
+    return (
+      <div className="space-y-6">
+        <header className="flex flex-wrap items-center justify-between gap-4">
+          <div>
+            <h1 className="text-2xl font-bold text-slate-900">Saved Quotations</h1>
+            <p className="mt-1 text-sm text-slate-500">Only quotations created by your admin account are shown.</p>
+          </div>
+          <Button onClick={() => { setSelectedQuote(null); setShowSaved(false); }}>
+            <Plus size={16} className="mr-2" />New Quotation
+          </Button>
+        </header>
+        {isLoading ? (
+          <p className="text-sm text-slate-500">Loading quotations...</p>
+        ) : savedQuotes.length === 0 ? (
+          <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-500">No saved quotations yet.</div>
+        ) : (
+          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+            {savedQuotes.map((quote) => (
+              <article key={quote.id} className="rounded-2xl border border-slate-200 bg-white p-5 shadow-sm">
+                <div className="flex items-start justify-between gap-3">
+                  <div><p className="text-xs font-semibold uppercase tracking-wider text-sky-700">{quote.quoteNumber}</p><h2 className="mt-1 font-bold text-slate-900">{quote.projectName}</h2></div>
+                  <span className="rounded-full bg-slate-100 px-2.5 py-1 text-xs font-semibold capitalize text-slate-600">{quote.status}</span>
+                </div>
+                <p className="mt-3 text-sm text-slate-600">{quote.clientName}</p>
+                <p className="mt-1 text-lg font-bold text-slate-900">{money(quote.totalAmount)}</p>
+                <div className="mt-5 flex gap-2">
+                  {quote.status === "converted" && quote.convertedProject?.id ? (
+                    <Button className="flex-1" onClick={() => navigate(`/projects/${quote.convertedProject?.id}`)}>Open Project</Button>
+                  ) : (
+                    <Button className="flex-1" variant="outline" onClick={() => { setSelectedQuote(quote); setShowSaved(false); }}>Open</Button>
+                  )}
+                  {(["draft", "sent"] as string[]).includes(quote.status) && <Button variant="outline" disabled={isRejecting} title="Reject quotation" onClick={async () => { if (window.confirm(`Reject ${quote.quoteNumber}?`)) await rejectQuote({ id: quote.id }).unwrap(); }}><CircleOff size={15} /></Button>}
+                  {(["draft", "sent", "accepted"] as string[]).includes(quote.status) && <Button variant="outline" disabled={isCancelling} title="Cancel quotation" onClick={async () => { if (window.confirm(`Cancel ${quote.quoteNumber}?`)) await cancelQuote(quote.id).unwrap(); }}><Archive size={15} /></Button>}
+                  {quote.status !== "converted" && <Button variant="outline" disabled={isDeleting} title="Delete quotation" onClick={async () => { if (window.confirm(`Delete ${quote.quoteNumber}?`)) await deleteQuote(quote.id).unwrap(); }}><Trash2 size={15} /></Button>}
+                </div>
+              </article>
+            ))}
+          </div>
+        )}
+      </div>
+    );
+  }
+
+  return <QuotationBuilder key={selectedQuote?.id ?? "new"} initialQuote={selectedQuote} onOpenSaved={() => setShowSaved(true)} onSaved={setSelectedQuote} />;
+}
+
+function QuotationBuilder({ initialQuote, onOpenSaved, onSaved }: { initialQuote: QuoteEstimate | null; onOpenSaved: () => void; onSaved: (quote: QuoteEstimate) => void }) {
+  const navigate = useNavigate();
+  const initialBuildingPlan = initialQuote?.buildingPlan as ({ totalFloors?: number; capacity?: number; floorMode?: string; customLabels?: string; floors?: Floor[] } | null | undefined);
+  const initialPricing = initialQuote?.pricingConfig as ({ services?: Service[] } | null | undefined);
+  const restoredFloors: Floor[] = Array.isArray(initialBuildingPlan?.floors)
+    ? initialBuildingPlan.floors.map((floor) => ({
+        id: floor?.id || uid(),
+        label: floor?.label || "Untitled floor",
+        prefix: floor?.prefix || "",
+        selected: floor?.selected !== false,
+        units: Array.isArray(floor?.units)
+          ? floor.units.map((unit) => ({
+              id: unit?.id || uid(),
+              label: unit?.label || "Untitled unit",
+              selected: unit?.selected !== false,
+            }))
+          : [],
+      }))
+    : [];
+  const restoredServices: Service[] = Array.isArray(initialPricing?.services)
+    ? initialPricing.services.map((service) => ({
+        id: service?.id || uid(),
+        title: service?.title || "",
+        description: service?.description || "",
+        rate: Number(service?.rate) || 0,
+        hours: Number(service?.hours) || 1,
+        units: Array.isArray(service?.units) ? service.units.filter(Boolean) : [],
+        costs: Array.isArray(service?.costs)
+          ? service.costs.map((cost) => ({
+              id: cost?.id || uid(),
+              name: cost?.name || "",
+              basis: cost?.basis === "unit" || cost?.basis === "hour" ? cost.basis : "fixed",
+              amount: Number(cost?.amount) || 0,
+            }))
+          : [],
+        reviewed: Boolean(service?.reviewed),
+      }))
+    : [];
+  const restoredDetails: QuotationBlock[] = Array.isArray(initialQuote?.quotationDetails)
+    ? (initialQuote.quotationDetails as QuotationBlock[]).map((block) => ({
+        heading: Boolean(block?.heading),
+        ...(block?.heading ? { headingLevel: block.headingLevel === 1 ? 1 as const : 2 as const } : {}),
+        bullet: Boolean(block?.bullet),
+        runs: Array.isArray(block?.runs)
+          ? block.runs.map((run) => ({
+              text: String(run?.text ?? ""),
+              ...(run?.bold ? { bold: true } : {}),
+              ...(run?.italic ? { italic: true } : {}),
+              ...(run?.underline ? { underline: true } : {}),
+            }))
+          : [],
+      }))
+    : [];
+  const { data: companies = [] } = useGetCompaniesQuery({ limit: 100 });
+  const [createQuote, { isLoading: isCreatingQuote }] = useCreateQuoteEstimateMutation();
+  const [updateQuote, { isLoading: isUpdatingQuote }] = useUpdateQuoteEstimateMutation();
+  const [sendQuote, { isLoading: isSendingQuote }] = useSendQuoteEstimateMutation();
+  const [convertQuote, { isLoading: isConvertingQuote }] = useAcceptAndCreateQuoteEstimateProjectMutation();
+  const [currentQuote, setCurrentQuote] = useState<QuoteEstimate | null>(initialQuote);
+  const [saveMessage, setSaveMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
   const [step, setStep] = useState(0);
   const [areaPreviewOpen, setAreaPreviewOpen] = useState(false);
   const [info, setInfo] = useState({
-    company: "",
-    project: "",
-    client: "",
-    address: "",
-    phone: "",
-    email: "",
-    projectType: "New Construction",
-    propertyType: "Residential",
-    buildingType: "Apartment Building",
-    start: "",
-    end: "",
+    companyId: initialQuote?.companyId ?? "",
+    company: initialQuote?.company?.name ?? "",
+    project: initialQuote?.projectName ?? "",
+    client: initialQuote?.clientName ?? "",
+    address: initialQuote?.projectAddress ?? "",
+    phone: initialQuote?.clientPhone ?? "",
+    email: initialQuote?.clientEmail ?? "",
+    projectType: initialQuote?.projectType ?? "New Construction",
+    propertyType: initialQuote?.propertyType ?? "Residential",
+    buildingType: initialQuote?.unitType ?? "Apartment Building",
+    start: initialQuote?.startDate?.slice(0, 10) ?? "",
+    end: initialQuote?.endDate?.slice(0, 10) ?? "",
   });
-  const [totalFloors, setTotalFloors] = useState(4);
-  const [capacity, setCapacity] = useState(6);
-  const [floorMode, setFloorMode] = useState("Standard");
-  const [customLabels, setCustomLabels] = useState("B1, G, 1, PH");
+  const [totalFloors, setTotalFloors] = useState(initialBuildingPlan?.totalFloors ?? 4);
+  const [capacity, setCapacity] = useState(initialBuildingPlan?.capacity ?? 6);
+  const [floorMode, setFloorMode] = useState(initialBuildingPlan?.floorMode ?? "Standard");
+  const [customLabels, setCustomLabels] = useState(initialBuildingPlan?.customLabels ?? "B1, G, 1, PH");
   const [buildingModalOpen, setBuildingModalOpen] = useState(false);
   const [buildingDraft, setBuildingDraft] = useState({ totalFloors: 4, capacity: 6, floorMode: "Standard", customLabels: "B1, G, 1, PH" });
-  const [floors, setFloors] = useState<Floor[]>([]);
+  const [floors, setFloors] = useState<Floor[]>(restoredFloors);
   const [unitModalOpen, setUnitModalOpen] = useState(false);
   const [unitTargetMode, setUnitTargetMode] = useState("all");
   const [unitTargetIds, setUnitTargetIds] = useState<string[]>([]);
@@ -200,7 +334,7 @@ function QuotationBuilder() {
   const [digits, setDigits] = useState(2);
   const [separator, setSeparator] = useState("");
   const [serviceDraft, setServiceDraft] = useState<Service | null>(null);
-  const [services, setServices] = useState<Service[]>([]);
+  const [services, setServices] = useState<Service[]>(restoredServices);
   const [serviceMode, setServiceMode] = useState("custom");
   const [serviceSearch, setServiceSearch] = useState("");
   const [floorSearch, setFloorSearch] = useState("");
@@ -216,7 +350,7 @@ function QuotationBuilder() {
   const [confirmed, setConfirmed] = useState(false);
   const [complete, setComplete] = useState(false);
   const [actionErrors, setActionErrors] = useState<QuotationErrors>({});
-  const [quotationDetails, setQuotationDetails] = useState<QuotationBlock[]>([]);
+  const [quotationDetails, setQuotationDetails] = useState<QuotationBlock[]>(restoredDetails);
 
   const [isDownloadingPdf, setIsDownloadingPdf] = useState(false);
   const [pdfMessage, setPdfMessage] = useState<{ type: "success" | "error"; text: string } | null>(null);
@@ -274,6 +408,7 @@ function QuotationBuilder() {
     end: info.end || "",
     details: quotationDetails.map((block) => ({
       heading: Boolean(block.heading),
+      ...(block.heading ? { headingLevel: block.headingLevel ?? 2 } : {}),
       bullet: Boolean(block.bullet),
       runs: (block.runs || []).map((r) => ({
         text: String(r.text || ""),
@@ -310,6 +445,91 @@ function QuotationBuilder() {
       };
     }),
   });
+
+  const buildEstimatePayload = (): CreateQuoteEstimatePayload => {
+    const selectedUnits = selectedFloors.flatMap((floor) =>
+      floor.units.filter((unit) => unit.selected).map((unit) => ({ floor, unit })),
+    );
+    return {
+      companyId: info.companyId,
+      projectName: info.project.trim(),
+      clientName: info.client.trim(),
+      clientEmail: info.email.trim() || undefined,
+      clientPhone: info.phone.trim() || undefined,
+      projectAddress: info.address.trim() || undefined,
+      projectType: info.projectType,
+      propertyType: info.propertyType,
+      unitType: info.buildingType,
+      startDate: info.start || undefined,
+      endDate: info.end || undefined,
+      floorsCount: selectedFloors.length,
+      unitsPerFloor: selectedFloors.length ? Math.max(...selectedFloors.map((floor) => floor.units.filter((unit) => unit.selected).length)) : 0,
+      schemaVersion: 2,
+      quotationDetails,
+      buildingPlan: { totalFloors, capacity, floorMode, customLabels, floors },
+      pricingConfig: { services },
+      tasks: services.map((service, index) => {
+        const assigned = selectedUnits.filter(({ unit }) => service.units.includes(unit.id));
+        const serviceTotal = totals(service).hourly * service.hours + totals(service).once;
+        return {
+          title: service.title.trim() || `Service ${index + 1}`,
+          description: service.description.trim() || undefined,
+          quantity: 1,
+          unit: "service",
+          estimatedHours: Math.max(0, Number(service.hours) || 0),
+          unitPrice: Math.max(0, serviceTotal),
+          locationMode: "selected" as const,
+          plannedLocationKeys: assigned.map(({ floor, unit }) => `floor_${locationToken(floor.label)}_unit_${locationToken(unit.label)}`),
+          scopeChecklist: service.costs.map((cost) => `${cost.name} (${cost.basis}: ${cost.amount})`),
+          sortOrder: index,
+        };
+      }),
+    };
+  };
+
+  const saveQuotation = async () => {
+    setSaveMessage(null);
+    if (!info.companyId || !info.project.trim() || !info.client.trim()) {
+      setSaveMessage({ type: "error", text: "Company, project name and client name are required before saving." });
+      throw new Error("Required quotation details are missing");
+    }
+    const payload = buildEstimatePayload();
+    try {
+      const result = currentQuote
+        ? await updateQuote({ id: currentQuote.id, data: payload }).unwrap()
+        : await createQuote(payload).unwrap();
+      setCurrentQuote(result.quote);
+      onSaved(result.quote);
+      setSaveMessage({ type: "success", text: `${result.quote.quoteNumber} saved successfully.` });
+      return result.quote;
+    } catch (error: any) {
+      const text = error?.data?.message || error?.message || "Unable to save quotation.";
+      setSaveMessage({ type: "error", text });
+      throw error;
+    }
+  };
+
+  const handlePersistedSend = async () => {
+    try {
+      const quote = await saveQuotation();
+      const result = await sendQuote(quote.id).unwrap();
+      setCurrentQuote(result.quote);
+      onSaved(result.quote);
+      setSaveMessage({ type: "success", text: "Quotation saved and emailed to the client." });
+    } catch (error: any) {
+      setSaveMessage({ type: "error", text: error?.data?.message || error?.message || "Unable to send quotation." });
+    }
+  };
+
+  const handleConvertToProject = async () => {
+    try {
+      const quote = await saveQuotation();
+      const result = await convertQuote({ id: quote.id, acceptedByName: info.client }).unwrap();
+      if (result.project?.id) navigate(`/projects/${result.project.id}`);
+    } catch (error: any) {
+      setSaveMessage({ type: "error", text: error?.data?.message || error?.message || "Unable to create project." });
+    }
+  };
 
   const handleDownloadPdf = async () => {
     setIsDownloadingPdf(true);
@@ -565,8 +785,17 @@ function QuotationBuilder() {
       <header className="qv2-page-header">
         <div>
           <h1>{steps[step]}</h1>
+          {currentQuote && <p>{currentQuote.quoteNumber} · <span className="capitalize">{currentQuote.status}</span></p>}
+        </div>
+        <div className="flex flex-wrap gap-2">
+          <Button variant="outline" onClick={onOpenSaved}><FileText size={15} className="mr-2" />Saved Quotations</Button>
+          <Button variant="outline" disabled={isCreatingQuote || isUpdatingQuote || currentQuote?.status === "converted"} onClick={() => void saveQuotation().catch(() => undefined)}>
+            {(isCreatingQuote || isUpdatingQuote) ? <Loader2 size={15} className="mr-2 animate-spin" /> : <FileEdit size={15} className="mr-2" />}
+            {currentQuote ? "Update Draft" : "Save Draft"}
+          </Button>
         </div>
       </header>
+      {saveMessage && <div role="status" className={`mb-5 rounded-xl border p-3 text-sm ${saveMessage.type === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-red-200 bg-red-50 text-red-800"}`}>{saveMessage.text}</div>}
       {complete ? (
         <Section title="Quotation confirmed for this preview">
           <div className="flex items-start gap-4 rounded-xl bg-emerald-50 p-5 text-emerald-800">
@@ -574,8 +803,7 @@ function QuotationBuilder() {
             <div>
               <p className="font-semibold">{info.project}</p>
               <p className="mt-1 text-sm">
-                Your quotation is ready to review in this session. It has not
-                been saved or sent to a server.
+                Your quotation is ready. Save it to keep the quotation and enable project conversion.
               </p>
             </div>
           </div>
@@ -599,7 +827,12 @@ function QuotationBuilder() {
                     description="Add the business and main contact for this project."
                   >
                     <div className="grid gap-5 sm:grid-cols-2">
-                      {textField("company", "Company / Business Name")}
+                      <Field label="Company / Business Name">
+                        <select className={control} value={info.companyId} onChange={(event) => { const company = companies.find((item) => item.id === event.target.value); setInfo((current) => ({ ...current, companyId: event.target.value, company: company?.name ?? "" })); }}>
+                          <option value="">Select company</option>
+                          {companies.map((company) => <option key={company.id} value={company.id}>{company.name}</option>)}
+                        </select>
+                      </Field>
                       {textField("project", "Project Name")}
                       {textField("client", "Client Name")}
                       {textField("phone", "Phone Number", "tel")}
@@ -1073,7 +1306,7 @@ function QuotationBuilder() {
                           </div>
                           {serviceMode === "custom" && <Field label="New service name"><input className={control} placeholder="Enter a service name" value={s.title} onChange={event => updateService(s.id, { title: event.target.value })} /></Field>}
                         </div>
-                        <Field label="Hourly rate per unit ($)">
+                        <Field label="Cost per unit ($)">
                           <input
                             className={control}
                             type="number"
@@ -1157,37 +1390,6 @@ function QuotationBuilder() {
                       <div><strong>{services.length}</strong><span>Assigned services</span></div>
                     </div>
 
-                    <div className="mt-6 flex flex-wrap items-center gap-3 pt-4 border-t border-gray-200/80">
-                      <Button
-                        variant="outline"
-                        onClick={handleDownloadPdf}
-                        disabled={isDownloadingPdf}
-                        className="bg-white hover:bg-gray-50 text-gray-800 shadow-xs"
-                      >
-                        {isDownloadingPdf ? (
-                          <>
-                            <Loader2 size={16} className="mr-2 animate-spin text-sky-700" />
-                            Generating PDF...
-                          </>
-                        ) : (
-                          <>
-                            <Download size={16} className="mr-2 text-sky-700" />
-                            Download PDF
-                          </>
-                        )}
-                      </Button>
-                      <Button
-                        onClick={() => {
-                          setRecipientEmail(info.email || '');
-                          setEmailStatus(null);
-                          setEmailModalOpen(true);
-                        }}
-                        className="bg-sky-800 hover:bg-sky-900 text-white shadow-xs"
-                      >
-                        <Mail size={16} className="mr-2" />
-                        Send to Client Email
-                      </Button>
-                    </div>
                   </div>
 
                   {pdfMessage && (
@@ -1240,7 +1442,7 @@ function QuotationBuilder() {
                     <div className="qv2-quote-table-wrap">
                       <table className="qv2-quote-table">
                         <caption className="sr-only">Itemized quotation services and pricing in US dollars</caption>
-                        <thead><tr><th scope="col">Service</th><th scope="col">Rate / unit / hr</th><th scope="col">Units</th><th scope="col">Amount</th></tr></thead>
+                        <thead><tr><th scope="col">Service</th><th scope="col">Cost / unit</th><th scope="col">Units</th><th scope="col">Amount</th></tr></thead>
                         <tbody>{services.map(service => <tr key={service.id}><td><strong>{service.title || "Untitled service"}</strong>{service.description && <p>{service.description}</p>}<details className="qv2-quote-assignments"><summary>View assigned units</summary><div>{selectedFloors.map(floor => { const units = floor.units.filter(unit => unit.selected && service.units.includes(unit.id)); return units.length ? <p key={floor.id}><strong>{floor.label}:</strong> {units.map(unit => unit.label).join(", ")}</p> : null; })}{!totals(service).count && <p>No units assigned.</p>}</div></details></td><td>{money(service.rate)}</td><td>{totals(service).count}</td><td>{money(totals(service).hourly * service.hours + totals(service).once)}</td></tr>)}</tbody>
                         {services.length > 0 && <tfoot><tr><th colSpan={3} scope="row">Total cost</th><td>{money(quotationTotal)}</td></tr></tfoot>}
                       </table>
@@ -1255,8 +1457,8 @@ function QuotationBuilder() {
               <div className="qv2-quote-total">
                 <span className="qv2-quote-total-label">Quotation total</span>
                 <p>{money(quotationTotal)}</p><span className="qv2-quote-currency">USD</span>
-                <dl><div><dt>Services</dt><dd>{services.length}</dd></div><div><dt>Combined hourly rate</dt><dd>{money(hourly)}/hr</dd></div>{once > 0 && <div><dt>One-time charges</dt><dd>{money(once)}</dd></div>}</dl>
-                <p className="qv2-quote-rate-note">Hourly rates apply per assigned unit.</p>
+                <dl><div><dt>Services</dt><dd>{services.length}</dd></div><div><dt>Assigned unit cost</dt><dd>{money(hourly)}</dd></div>{once > 0 && <div><dt>One-time charges</dt><dd>{money(once)}</dd></div>}</dl>
+                <p className="qv2-quote-rate-note">The base cost applies to each assigned unit.</p>
               </div>
 
               <div className="rounded-xl border border-gray-200 bg-white p-4 shadow-xs space-y-3">
@@ -1265,6 +1467,15 @@ function QuotationBuilder() {
                   <p className="text-xs text-gray-500 mt-1">Generate a branded PDF or deliver directly to {info.client ? `${info.client}'s email` : 'client email'}.</p>
                 </div>
                 <div className="flex flex-col gap-2">
+                  <Button
+                    variant="outline"
+                    className="w-full justify-center text-xs"
+                    onClick={() => void saveQuotation().catch(() => undefined)}
+                    disabled={isCreatingQuote || isUpdatingQuote || currentQuote?.status === "converted"}
+                  >
+                    {(isCreatingQuote || isUpdatingQuote) ? <Loader2 size={14} className="mr-2 animate-spin" /> : <FileEdit size={14} className="mr-2" />}
+                    {currentQuote ? "Save Changes" : "Save Draft"}
+                  </Button>
                   <Button
                     variant="outline"
                     className="w-full justify-center text-xs"
@@ -1293,6 +1504,22 @@ function QuotationBuilder() {
                   >
                     <Mail size={14} className="mr-2" />
                     Send to Client Email
+                  </Button>
+                  <Button
+                    className="w-full justify-center text-xs"
+                    onClick={() => void handlePersistedSend()}
+                    disabled={isSendingQuote || isCreatingQuote || isUpdatingQuote || currentQuote?.status === "converted"}
+                  >
+                    {isSendingQuote ? <Loader2 size={14} className="mr-2 animate-spin" /> : <Send size={14} className="mr-2" />}
+                    Save & Send Tracked Quote
+                  </Button>
+                  <Button
+                    className="w-full justify-center bg-emerald-700 text-xs hover:bg-emerald-800"
+                    onClick={() => void handleConvertToProject()}
+                    disabled={isConvertingQuote || isCreatingQuote || isUpdatingQuote || currentQuote?.status === "converted"}
+                  >
+                    {isConvertingQuote ? <Loader2 size={14} className="mr-2 animate-spin" /> : <Building2 size={14} className="mr-2" />}
+                    {currentQuote?.status === "converted" ? "Project Created" : "Accept & Create Project"}
                   </Button>
                 </div>
               </div>

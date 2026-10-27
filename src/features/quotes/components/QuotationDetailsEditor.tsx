@@ -3,6 +3,7 @@ import {
   Bold,
   Italic,
   Underline,
+  Heading1,
   Heading2,
   List,
   Type,
@@ -23,6 +24,7 @@ export type QuotationTextRun = {
 export type QuotationBlock = {
   runs: QuotationTextRun[];
   heading?: boolean;
+  headingLevel?: 1 | 2;
   bullet?: boolean;
 };
 
@@ -32,6 +34,22 @@ export interface QuotationDetailsEditorProps {
   className?: string;
   placeholder?: string;
 }
+
+type ActiveFormats = {
+  block: 'h1' | 'h2' | 'p';
+  bold: boolean;
+  italic: boolean;
+  underline: boolean;
+  list: boolean;
+};
+
+const DEFAULT_FORMATS: ActiveFormats = {
+  block: 'p',
+  bold: false,
+  italic: false,
+  underline: false,
+  list: false,
+};
 
 function escapeHtml(str: string): string {
   return str
@@ -65,7 +83,7 @@ export function quotationBlocksToHtml(blocks: QuotationBlock[]): string {
         html += '</ul>';
         inList = false;
       }
-      const tag = block.heading ? 'h2' : 'p';
+      const tag = block.heading ? (block.headingLevel === 1 ? 'h1' : 'h2') : 'p';
       html += `<${tag}>`;
       for (const run of block.runs || []) {
         let runHtml = escapeHtml(run.text || '');
@@ -169,6 +187,7 @@ export function htmlToQuotationBlocks(container: HTMLElement): QuotationBlock[] 
       const isBullet = tag === 'li';
       const block: QuotationBlock = {
         ...(isHeading ? { heading: true } : {}),
+        ...(isHeading ? { headingLevel: tag === 'h1' ? 1 as const : 2 as const } : {}),
         ...(isBullet ? { bullet: true } : {}),
         runs: [],
       };
@@ -201,7 +220,7 @@ export const QuotationDetailsPreview: FC<{ blocks: QuotationBlock[]; className?:
       <ul key={`ul-${keyIdx}`} className="my-2 list-disc space-y-1 pl-5 text-sm text-gray-700">
         {currentBullets.map((b, bIdx) => (
           <li key={bIdx} className="leading-relaxed">
-            {b.runs.map((r, rIdx) => {
+            {(b.runs || []).map((r, rIdx) => {
               let textEl: JSX.Element = <span key={rIdx}>{r.text}</span>;
               if (r.underline) textEl = <u key={rIdx}>{textEl}</u>;
               if (r.italic) textEl = <em key={rIdx}>{textEl}</em>;
@@ -221,24 +240,25 @@ export const QuotationDetailsPreview: FC<{ blocks: QuotationBlock[]; className?:
     } else {
       flushBullets(idx);
       if (block.heading) {
+        const HeadingTag = block.headingLevel === 1 ? 'h2' : 'h3';
         elements.push(
-          <h3
+          <HeadingTag
             key={`h-${idx}`}
-            className="mt-4 mb-2 text-base font-bold text-sky-950 first:mt-0 tracking-tight"
+            className={`${block.headingLevel === 1 ? 'text-xl' : 'text-base'} mt-4 mb-2 font-bold text-sky-950 first:mt-0 tracking-tight`}
           >
-            {block.runs.map((r, rIdx) => {
+            {(block.runs || []).map((r, rIdx) => {
               let textEl: JSX.Element = <span key={rIdx}>{r.text}</span>;
               if (r.underline) textEl = <u key={rIdx}>{textEl}</u>;
               if (r.italic) textEl = <em key={rIdx}>{textEl}</em>;
               if (r.bold) textEl = <strong key={rIdx}>{textEl}</strong>;
               return textEl;
             })}
-          </h3>
+          </HeadingTag>
         );
       } else {
         elements.push(
           <p key={`p-${idx}`} className="my-2 text-sm leading-relaxed text-gray-700">
-            {block.runs.map((r, rIdx) => {
+            {(block.runs || []).map((r, rIdx) => {
               let textEl: JSX.Element = <span key={rIdx}>{r.text}</span>;
               if (r.underline) textEl = <u key={rIdx}>{textEl}</u>;
               if (r.italic) textEl = <em key={rIdx}>{textEl}</em>;
@@ -265,15 +285,48 @@ export function QuotationDetailsEditor({
   const editorRef = useRef<HTMLDivElement>(null);
   const [viewMode, setViewMode] = useState<'edit' | 'preview'>('edit');
   const [isSaved, setIsSaved] = useState(false);
+  const [activeFormats, setActiveFormats] = useState<ActiveFormats>(DEFAULT_FORMATS);
   const lastHtmlRef = useRef('');
+  const isComposingRef = useRef(false);
+  const savedSelectionRef = useRef<Range | null>(null);
 
   useEffect(() => {
+    if (viewMode !== 'edit') return;
     const nextHtml = quotationBlocksToHtml(value);
-    if (editorRef.current && editorRef.current.innerHTML !== nextHtml && nextHtml !== lastHtmlRef.current) {
+    if (
+      editorRef.current &&
+      document.activeElement !== editorRef.current &&
+      editorRef.current.innerHTML !== nextHtml
+    ) {
       editorRef.current.innerHTML = nextHtml;
       lastHtmlRef.current = nextHtml;
     }
-  }, [value]);
+  }, [value, viewMode]);
+
+  const rememberSelection = () => {
+    const selection = window.getSelection();
+    if (!editorRef.current || !selection?.rangeCount) return;
+    const range = selection.getRangeAt(0);
+    if (editorRef.current.contains(range.commonAncestorContainer)) {
+      savedSelectionRef.current = range.cloneRange();
+      const rawBlock = String(document.queryCommandValue('formatBlock') || '').toLowerCase();
+      setActiveFormats({
+        block: rawBlock.includes('h1') ? 'h1' : rawBlock.includes('h2') ? 'h2' : 'p',
+        bold: document.queryCommandState('bold'),
+        italic: document.queryCommandState('italic'),
+        underline: document.queryCommandState('underline'),
+        list: document.queryCommandState('insertUnorderedList'),
+      });
+    }
+  };
+
+  useEffect(() => {
+    const handleSelectionChange = () => {
+      if (document.activeElement === editorRef.current) rememberSelection();
+    };
+    document.addEventListener('selectionchange', handleSelectionChange);
+    return () => document.removeEventListener('selectionchange', handleSelectionChange);
+  }, []);
 
   const syncChanges = () => {
     if (!editorRef.current) return;
@@ -289,9 +342,22 @@ export function QuotationDetailsEditor({
     if (editorRef.current) {
       editorRef.current.focus();
     }
+    if (savedSelectionRef.current) {
+      const selection = window.getSelection();
+      selection?.removeAllRanges();
+      selection?.addRange(savedSelectionRef.current);
+    }
     document.execCommand(command, false, arg);
     syncChanges();
+    rememberSelection();
   };
+
+  const formatButtonClass = (active: boolean, compact = false) =>
+    `${compact ? 'p-1.5' : 'px-2 py-1'} rounded-md border transition-colors ${
+      active
+        ? 'border-sky-700 bg-sky-700 text-white shadow-sm'
+        : 'border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-100'
+    }`;
 
   const clearContent = () => {
     if (window.confirm('Clear all quotation details?')) {
@@ -305,7 +371,7 @@ export function QuotationDetailsEditor({
   const totalWords = value.reduce(
     (count, block) =>
       count +
-      block.runs.reduce(
+      (block.runs || []).reduce(
         (acc, run) => acc + (run.text.trim() ? run.text.trim().split(/\s+/).length : 0),
         0
       ),
@@ -355,12 +421,28 @@ export function QuotationDetailsEditor({
 
       {/* Formatting Toolbar */}
       {viewMode === 'edit' && (
-        <div className="flex flex-wrap items-center gap-1 border-b border-gray-100 bg-white px-3 py-2 text-xs">
+        <div
+          className="flex flex-wrap items-center gap-1 border-b border-gray-100 bg-white px-3 py-2 text-xs"
+          onMouseDown={(event) => {
+            if ((event.target as HTMLElement).closest('button')) event.preventDefault();
+          }}
+        >
+          <button
+            type="button"
+            title="Heading 1"
+            aria-pressed={activeFormats.block === 'h1'}
+            onClick={() => executeCommand('formatBlock', 'h1')}
+            className={`flex items-center gap-1 ${formatButtonClass(activeFormats.block === 'h1')}`}
+          >
+            <Heading1 size={14} />
+            <span className="text-[11px] font-semibold">H1</span>
+          </button>
           <button
             type="button"
             title="Heading 2"
-            onClick={() => executeCommand('formatBlock', '<h2>')}
-            className="flex items-center gap-1 rounded-md border border-gray-200 px-2 py-1 text-gray-700 hover:bg-gray-100 hover:border-gray-300"
+            aria-pressed={activeFormats.block === 'h2'}
+            onClick={() => executeCommand('formatBlock', 'h2')}
+            className={`flex items-center gap-1 ${formatButtonClass(activeFormats.block === 'h2')}`}
           >
             <Heading2 size={14} />
             <span className="text-[11px] font-semibold">H2</span>
@@ -368,8 +450,9 @@ export function QuotationDetailsEditor({
           <button
             type="button"
             title="Normal Paragraph"
-            onClick={() => executeCommand('formatBlock', '<p>')}
-            className="flex items-center gap-1 rounded-md border border-gray-200 px-2 py-1 text-gray-700 hover:bg-gray-100 hover:border-gray-300"
+            aria-pressed={activeFormats.block === 'p'}
+            onClick={() => executeCommand('formatBlock', 'p')}
+            className={`flex items-center gap-1 ${formatButtonClass(activeFormats.block === 'p')}`}
           >
             <Type size={14} />
             <span className="text-[11px]">Normal</span>
@@ -380,24 +463,27 @@ export function QuotationDetailsEditor({
           <button
             type="button"
             title="Bold (Ctrl+B)"
+            aria-pressed={activeFormats.bold}
             onClick={() => executeCommand('bold')}
-            className="rounded-md border border-gray-200 p-1.5 text-gray-700 hover:bg-gray-100 hover:border-gray-300"
+            className={formatButtonClass(activeFormats.bold, true)}
           >
             <Bold size={14} />
           </button>
           <button
             type="button"
             title="Italic (Ctrl+I)"
+            aria-pressed={activeFormats.italic}
             onClick={() => executeCommand('italic')}
-            className="rounded-md border border-gray-200 p-1.5 text-gray-700 hover:bg-gray-100 hover:border-gray-300"
+            className={formatButtonClass(activeFormats.italic, true)}
           >
             <Italic size={14} />
           </button>
           <button
             type="button"
             title="Underline (Ctrl+U)"
+            aria-pressed={activeFormats.underline}
             onClick={() => executeCommand('underline')}
-            className="rounded-md border border-gray-200 p-1.5 text-gray-700 hover:bg-gray-100 hover:border-gray-300"
+            className={formatButtonClass(activeFormats.underline, true)}
           >
             <Underline size={14} />
           </button>
@@ -407,8 +493,9 @@ export function QuotationDetailsEditor({
           <button
             type="button"
             title="Bullet List"
+            aria-pressed={activeFormats.list}
             onClick={() => executeCommand('insertUnorderedList')}
-            className="flex items-center gap-1 rounded-md border border-gray-200 px-2 py-1 text-gray-700 hover:bg-gray-100 hover:border-gray-300"
+            className={`flex items-center gap-1 ${formatButtonClass(activeFormats.list)}`}
           >
             <List size={14} />
             <span className="text-[11px]">List</span>
@@ -436,10 +523,26 @@ export function QuotationDetailsEditor({
               ref={editorRef}
               contentEditable
               suppressContentEditableWarning
-              onInput={syncChanges}
+              dir="ltr"
+              spellCheck
+              onInput={() => {
+                rememberSelection();
+                if (!isComposingRef.current) syncChanges();
+              }}
+              onKeyUp={rememberSelection}
+              onMouseUp={rememberSelection}
+              onCompositionStart={() => {
+                isComposingRef.current = true;
+              }}
+              onCompositionEnd={() => {
+                isComposingRef.current = false;
+                rememberSelection();
+                syncChanges();
+              }}
               onBlur={syncChanges}
+              onFocus={rememberSelection}
               data-placeholder={placeholder}
-              className="min-h-[220px] max-h-[500px] overflow-y-auto rounded-lg border border-gray-200 bg-white p-4 text-sm text-gray-800 leading-relaxed outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-500/15 transition-all prose-headings:font-bold prose-headings:text-sky-950 prose-h2:text-base prose-h2:mt-3 prose-h2:mb-1 prose-p:my-1.5 prose-ul:my-2 prose-ul:list-disc prose-ul:pl-5 prose-li:my-0.5"
+              className="min-h-[220px] max-h-[500px] overflow-y-auto rounded-lg border border-gray-200 bg-white p-4 text-left text-sm text-gray-800 leading-relaxed outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-500/15 transition-all prose-headings:font-bold prose-headings:text-sky-950 prose-h2:text-base prose-h2:mt-3 prose-h2:mb-1 prose-p:my-1.5 prose-ul:my-2 prose-ul:list-disc prose-ul:pl-5 prose-li:my-0.5"
             />
           </div>
         ) : (
