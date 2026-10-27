@@ -5,6 +5,21 @@ import react from "@vitejs/plugin-react";
 export default defineConfig({
   plugins: [react()],
 
+  server: {
+    proxy: {
+      "/api": {
+        target: "http://localhost:6000",
+        changeOrigin: true,
+        rewrite: (requestPath) => requestPath.replace(/^\/api/, ""),
+      },
+      "/socket.io": {
+        target: "http://localhost:6000",
+        changeOrigin: true,
+        ws: true,
+      },
+    },
+  },
+
   resolve: {
     alias: {
       "@": path.resolve(__dirname, "./src"),

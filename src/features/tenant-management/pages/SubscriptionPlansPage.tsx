@@ -43,6 +43,8 @@ type PlanFormState = {
   visibility: 'public' | 'private';
 };
 
+type PlanVisibility = PlanFormState['visibility'];
+
 const initialForm: PlanFormState = {
   name: '',
   priceMonthly: '0',
@@ -69,6 +71,7 @@ export function SubscriptionPlansPage() {
   const [formOpen, setFormOpen] = useState(false);
   const [editingPlan, setEditingPlan] = useState<SubscriptionPlanApi | null>(null);
   const [form, setForm] = useState<PlanFormState>(initialForm);
+  const [activeTab, setActiveTab] = useState<PlanVisibility>('public');
   const [isSaving, setIsSaving] = useState(false);
   const [formError, setFormError] = useState('');
 
@@ -96,6 +99,19 @@ export function SubscriptionPlansPage() {
       : 0;
     return { total: plans.length, active, average };
   }, [plans]);
+
+  const planCounts = useMemo(
+    () => ({
+      public: plans.filter((plan) => (plan.visibility ?? 'public') === 'public').length,
+      private: plans.filter((plan) => plan.visibility === 'private').length,
+    }),
+    [plans],
+  );
+
+  const visiblePlans = useMemo(
+    () => plans.filter((plan) => (plan.visibility ?? 'public') === activeTab),
+    [activeTab, plans],
+  );
 
   if (!isSuperAdmin) {
     return <PublicSubscriptionPlansPage isDashboardView={true} />;
@@ -204,11 +220,55 @@ export function SubscriptionPlansPage() {
         </Card>
       </div>
 
+      <div
+        role="tablist"
+        aria-label="Subscription plan visibility"
+        className="inline-flex rounded-xl border border-gray-200 bg-gray-50 p-1"
+      >
+        {(['public', 'private'] as const).map((visibility) => {
+          const isActive = activeTab === visibility;
+          const label = visibility === 'public' ? 'Public' : 'Private';
+
+          return (
+            <button
+              key={visibility}
+              type="button"
+              role="tab"
+              aria-selected={isActive}
+              onClick={() => setActiveTab(visibility)}
+              className={`rounded-lg px-5 py-2.5 text-sm font-semibold transition-colors ${
+                isActive
+                  ? 'bg-white text-gray-900 shadow-sm'
+                  : 'text-gray-500 hover:text-gray-900'
+              }`}
+            >
+              {label}
+              <span
+                className={`ml-2 rounded-full px-2 py-0.5 text-xs ${
+                  isActive ? 'bg-blue-50 text-blue-700' : 'bg-gray-200 text-gray-600'
+                }`}
+              >
+                {planCounts[visibility]}
+              </span>
+            </button>
+          );
+        })}
+      </div>
+
       <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-6">
         {loading ? (
           <div className="text-sm text-gray-500">Loading plans...</div>
+        ) : visiblePlans.length === 0 ? (
+          <Card className="p-8 text-center md:col-span-2 xl:col-span-3">
+            <div className="text-base font-semibold text-gray-900">
+              No {activeTab} plans yet
+            </div>
+            <div className="mt-1 text-sm text-gray-500">
+              Create a plan or change an existing plan's visibility to see it here.
+            </div>
+          </Card>
         ) : (
-          plans.map((plan) => (
+          visiblePlans.map((plan) => (
             <Card key={plan.id} className={`p-6 ${!plan.isActive ? 'opacity-60' : ''}`}>
               <div className="flex items-center justify-between mb-4">
                 <h3 className="text-2xl font-bold">{plan.name}</h3>

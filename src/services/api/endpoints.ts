@@ -210,6 +210,8 @@ export const API_ENDPOINTS = {
         CANCEL: (id: string) => `/admin/quote-estimates/${id}/cancel`,
         CONVERT_TO_PROJECT: (id: string) => `/admin/quote-estimates/${id}/convert-to-project`,
         ACCEPT_AND_CREATE_PROJECT: (id: string) => `/admin/quote-estimates/${id}/accept-and-create-project`,
+        V2_EXPORT_PDF: '/admin/quote-estimates/v2/export-pdf',
+        V2_EMAIL: '/admin/quote-estimates/v2/email',
     },
 
     // TENANTS

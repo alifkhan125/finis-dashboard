@@ -47,6 +47,7 @@ export const ROUTES = {
 
     // Quotes
     QUOTES: '/quotes',
+    QUOTES_V2: '/quotes-v2',
 
     // Communication
     CHAT: '/chat',

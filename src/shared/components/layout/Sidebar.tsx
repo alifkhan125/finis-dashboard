@@ -43,6 +43,7 @@ const menuItems = [
     items: [
       { icon: FileBarChart, label: 'Reports', path: '/reports' },
       { icon: ScrollText, label: 'Quotes Library', path: '/quotes' },
+      { icon: ScrollText, label: 'Quotation Library V2', path: '/quotes-v2' },
       { icon: DollarSign, label: 'Expenses', path: '/expenses' }
     ]
   },
@@ -95,6 +96,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
     return menuItems.map(section => {
       const items = section.items
         .filter(item => {
+          if (item.path === '/quotes-v2' && authUser?.role !== 'admin') return false;
           if (!isSuperAdmin && (item.path === '/tenants' || item.path === '/admins' || item.path === '/users')) {
             return false;
           }
@@ -120,7 +122,7 @@ export function Sidebar({ isOpen, onClose }: SidebarProps) {
         items,
       };
     }).filter(section => section.items.length > 0);
-  }, [isSuperAdmin]);
+  }, [isSuperAdmin, authUser?.role]);
 
   const resolveAvatarUrl = (value?: string | null) => {
     if (!value) return '';
