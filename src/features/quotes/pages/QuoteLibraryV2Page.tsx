@@ -187,7 +187,7 @@ export function QuoteLibraryV2Page() {
 
 function QuotationWorkspace() {
   const navigate = useNavigate();
-  const [showSaved, setShowSaved] = useState(false);
+  const [showSaved, setShowSaved] = useState(true);
   const [selectedQuote, setSelectedQuote] = useState<QuoteEstimate | null>(null);
   const { data, isLoading } = useGetQuoteEstimatesQuery({ limit: 100 });
   const savedQuotes = Array.isArray(data?.data) ? data.data : [];
@@ -210,7 +210,12 @@ function QuotationWorkspace() {
         {isLoading ? (
           <p className="text-sm text-slate-500">Loading quotations...</p>
         ) : savedQuotes.length === 0 ? (
-          <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-500">No saved quotations yet.</div>
+          <div className="rounded-2xl border border-dashed border-slate-300 bg-white p-10 text-center text-sm text-slate-500">
+            <p>No saved quotations yet.</p>
+            <Button className="mt-4" onClick={() => { setSelectedQuote(null); setShowSaved(false); }}>
+              <Plus size={16} className="mr-2" />Create Quotation
+            </Button>
+          </div>
         ) : (
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
             {savedQuotes.map((quote) => (
