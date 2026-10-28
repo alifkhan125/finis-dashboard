@@ -2,7 +2,9 @@ import { useEffect, useRef, useCallback } from 'react';
 import { io, Socket } from 'socket.io-client';
 import { Message, Thread } from '../messageApi';
 
-const SOCKET_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:6000';
+const SOCKET_URL = import.meta.env.VITE_API_BASE_URL === '/api'
+    ? window.location.origin
+    : import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:6000';
 
 // ─────────────────────────────────────────────
 // HOOK

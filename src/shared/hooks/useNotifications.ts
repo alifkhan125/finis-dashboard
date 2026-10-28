@@ -17,6 +17,7 @@ type ApiNotification = {
 };
 
 function getApiOrigin() {
+  if (config.apiBaseUrl === '/api') return window.location.origin;
   try {
     const url = new URL(config.apiBaseUrl);
     const pathname = url.pathname.replace(/\/+$/, '');

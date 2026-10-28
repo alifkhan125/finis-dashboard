@@ -545,17 +545,16 @@ function QuotationBuilder({ initialQuote, onOpenSaved, onSaved }: { initialQuote
     setIsDownloadingPdf(true);
     setPdfMessage(null);
     try {
-      const payload = buildQuotationPayload();
+      const quote = await saveQuotation();
       const token = localStorage.getItem("auth_token");
       const response = await fetch(
-        `${config.apiBaseUrl}/admin/quote-estimates/v2/export-pdf`,
+        `${config.apiBaseUrl}/admin/quote-estimates/${quote.id}/pdf`,
         {
-          method: "POST",
+          method: "GET",
           headers: {
-            "Content-Type": "application/json",
+            Accept: "application/pdf",
             ...(token ? { Authorization: `Bearer ${token}` } : {}),
           },
-          body: JSON.stringify(payload),
         },
       );
 
@@ -578,7 +577,7 @@ function QuotationBuilder({ initialQuote, onOpenSaved, onSaved }: { initialQuote
         .trim()
         .toLowerCase()
         .replace(/[^a-z0-9_-]/g, "_");
-      link.download = `quotation-${cleanProject}.pdf`;
+      link.download = `${quote.quoteNumber || `quotation-${cleanProject}`}.pdf`;
       document.body.appendChild(link);
       link.click();
       document.body.removeChild(link);

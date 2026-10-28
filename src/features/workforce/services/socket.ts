@@ -27,6 +27,7 @@ export function startWorkforceSocket(store: Store, projectId: string) {
   }
 
   const SERVER = (() => {
+    if (config.apiBaseUrl === '/api') return window.location.origin;
     try {
       const url = new URL(config.apiBaseUrl);
       const pathname = url.pathname.replace(/\/+$/, '');
