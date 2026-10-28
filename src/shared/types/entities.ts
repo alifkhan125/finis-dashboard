@@ -129,6 +129,7 @@ export interface Project {
     teamMembers: number;
     floors: number;
   };
+  quotation?: any;
   createdAt: string;
 }
 

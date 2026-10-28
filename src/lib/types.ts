@@ -104,6 +104,7 @@ export interface Project {
     name: string;
     image: string;
   }[];
+  quotation?: any;
   createdAt: string;
 }
 

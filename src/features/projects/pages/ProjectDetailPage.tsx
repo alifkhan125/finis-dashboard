@@ -20,6 +20,7 @@ import { useProject, useUpdateProject, useProjectAnalysis, useProjectFloorPlan }
 import { apiClient } from '@/services/api/client';
 import { Link as LinkIcon } from 'lucide-react';
 import { CreateExpenseModal } from '@/features/expenses/components/CreateExpenseModal';
+import { ProjectQuotationView } from '../components/ProjectQuotationView';
 
 export function ProjectDetailPage() {
   const authUser = (() => {
@@ -125,6 +126,7 @@ export function ProjectDetailPage() {
     { id: 'overview', label: 'Overview' },
     { id: 'scope_structure', label: 'Scope & Structure' },
     { id: 'tasks', label: 'Tasks', count: taskCount || undefined },
+    { id: 'quotation', label: 'Quotation' },
     { id: 'documents', label: 'Documents' }
   ];
   if (!isSuperAdmin) {
@@ -522,6 +524,10 @@ export function ProjectDetailPage() {
 
         {!isSuperAdmin && activeTab === 'team' && <ProjectTeam />}
         {activeTab === 'documents' && <ProjectDocuments />}
+
+        {activeTab === 'quotation' && (
+          <ProjectQuotationView project={project} onQuotationUpdated={() => refetch()} />
+        )}
 
         {isAdmin && activeTab === 'statement' && (
           <ProjectStatementView projectId={project.id} />

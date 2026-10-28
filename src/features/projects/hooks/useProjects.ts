@@ -272,6 +272,7 @@ const mapProject = (project: BackendProject): Project => {
             teamMembers: project._count?.teamMembers ?? rawTeamMembers.length,
             floors: project._count?.floors ?? floors.length,
         },
+        quotation: (project as any).quotation ?? null,
         createdAt: project.createdAt || new Date().toISOString(),
     };
 };
