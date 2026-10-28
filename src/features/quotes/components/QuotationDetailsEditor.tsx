@@ -4,6 +4,7 @@ import {
   Italic,
   Underline,
   List,
+  ListOrdered,
   FileText,
   Trash2,
   Eye,
@@ -36,11 +37,12 @@ export interface QuotationDetailsEditorProps {
 }
 
 type ActiveFormats = {
-  block: 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'p';
+  block: 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'p' | 'ul' | 'ol';
   bold: boolean;
   italic: boolean;
   underline: boolean;
   list: boolean;
+  orderedList: boolean;
   fontSize: number | null;
 };
 
@@ -50,6 +52,7 @@ const DEFAULT_FORMATS: ActiveFormats = {
   italic: false,
   underline: false,
   list: false,
+  orderedList: false,
   fontSize: null,
 };
 
@@ -116,20 +119,21 @@ export function quotationBlocksToHtml(blocks: QuotationBlock[]): string {
   return html;
 }
 
-export function htmlToQuotationBlocks(container: HTMLElement): QuotationBlock[] {
-  const blocks: QuotationBlock[] = [];
+function parseRunsFromNode(node: Node, container: HTMLElement): QuotationTextRun[] {
+  const runs: QuotationTextRun[] = [];
 
-  function processTextAndInline(node: Node, block: QuotationBlock) {
-    if (node.nodeType === Node.TEXT_NODE) {
-      const text = node.textContent || '';
+  function walk(curr: Node) {
+    if (curr.nodeType === Node.TEXT_NODE) {
+      const text = curr.textContent || '';
       if (!text) return;
 
       let bold = false;
       let italic = false;
       let underline = false;
       let fontSize: number | undefined;
-      let parent = node.parentElement;
 
+      // Traverse from closest parent up to container
+      let parent = curr.parentElement;
       while (parent && parent !== container) {
         const tag = parent.tagName.toLowerCase();
         if (
@@ -146,78 +150,195 @@ export function htmlToQuotationBlocks(container: HTMLElement): QuotationBlock[] 
         if (tag === 'u' || (parent.style.textDecoration && parent.style.textDecoration.includes('underline'))) {
           underline = true;
         }
-        const inlineSize = Number.parseFloat(parent.style.fontSize);
-        if (Number.isFinite(inlineSize)) fontSize = Math.round(inlineSize);
+        // Innermost font-size takes precedence
+        if (fontSize === undefined) {
+          const inlineSize = Number.parseFloat(parent.style.fontSize);
+          if (Number.isFinite(inlineSize) && inlineSize > 0) {
+            fontSize = Math.round(inlineSize);
+          }
+        }
         parent = parent.parentElement;
       }
 
-      block.runs.push({
+      runs.push({
         text,
         ...(bold ? { bold: true } : {}),
         ...(italic ? { italic: true } : {}),
         ...(underline ? { underline: true } : {}),
         ...(fontSize ? { fontSize } : {}),
       });
-    } else if (node.nodeType === Node.ELEMENT_NODE) {
-      const el = node as HTMLElement;
+    } else if (curr.nodeType === Node.ELEMENT_NODE) {
+      const el = curr as HTMLElement;
       const tag = el.tagName.toLowerCase();
       if (tag === 'br') {
-        block.runs.push({ text: '\n' });
+        runs.push({ text: '\n' });
       } else {
         for (const child of Array.from(el.childNodes)) {
-          processTextAndInline(child, block);
+          walk(child);
         }
       }
     }
   }
 
-  const allBlocks = container.querySelectorAll('h1, h2, h3, h4, h5, h6, p, li, div');
+  walk(node);
+  return runs;
+}
 
-  if (allBlocks.length === 0) {
-    const singleBlock: QuotationBlock = { runs: [] };
-    for (const child of Array.from(container.childNodes)) {
-      processTextAndInline(child, singleBlock);
+function parseRunsFromNodes(nodes: Node[], container: HTMLElement): QuotationTextRun[] {
+  const allRuns: QuotationTextRun[] = [];
+  for (const node of nodes) {
+    allRuns.push(...parseRunsFromNode(node, container));
+  }
+  const merged: QuotationTextRun[] = [];
+  for (const r of allRuns) {
+    if (!r.text) continue;
+    const prev = merged[merged.length - 1];
+    if (
+      prev &&
+      Boolean(prev.bold) === Boolean(r.bold) &&
+      Boolean(prev.italic) === Boolean(r.italic) &&
+      Boolean(prev.underline) === Boolean(r.underline) &&
+      prev.fontSize === r.fontSize
+    ) {
+      prev.text += r.text;
+    } else {
+      merged.push({ ...r });
     }
-    if (singleBlock.runs.length > 0 && singleBlock.runs.some(r => r.text.trim())) {
-      blocks.push(singleBlock);
+  }
+  return merged;
+}
+
+function isBlockTag(tag: string): boolean {
+  return /^(p|div|h[1-6]|ul|ol|li|blockquote|section|article)$/.test(tag);
+}
+
+function hasBlockDescendant(el: HTMLElement): boolean {
+  for (const child of Array.from(el.childNodes)) {
+    if (child.nodeType === Node.ELEMENT_NODE) {
+      const childEl = child as HTMLElement;
+      const tag = childEl.tagName.toLowerCase();
+      if (isBlockTag(tag) || hasBlockDescendant(childEl)) {
+        return true;
+      }
     }
-  } else {
-    const topBlocks: HTMLElement[] = [];
-    allBlocks.forEach((node) => {
-      const el = node as HTMLElement;
-      let isNestedInBlock = false;
-      let p = el.parentElement;
-      while (p && p !== container) {
-        const pTag = p.tagName.toLowerCase();
-        if (/^h[1-6]$/.test(pTag) || pTag === 'p' || pTag === 'li') {
-          isNestedInBlock = true;
-          break;
+  }
+  return false;
+}
+
+export function htmlToQuotationBlocks(container: HTMLElement): QuotationBlock[] {
+  const blocks: QuotationBlock[] = [];
+
+  function processBlockNode(node: Node) {
+    if (node.nodeType === Node.TEXT_NODE) {
+      const text = node.textContent || '';
+      if (text.trim()) {
+        const runs = parseRunsFromNodes([node], container);
+        if (runs.length > 0) {
+          blocks.push({ runs });
         }
-        p = p.parentElement;
       }
-      if (!isNestedInBlock) {
-        topBlocks.push(el);
-      }
-    });
+      return;
+    }
 
-    for (const el of topBlocks) {
-      const tag = el.tagName.toLowerCase();
-      const isHeading = /^h[1-6]$/.test(tag);
-      const isBullet = tag === 'li';
-      const block: QuotationBlock = {
-        ...(isHeading ? { heading: true } : {}),
-        ...(isHeading ? { headingLevel: Math.min(5, Math.max(1, Number(tag.slice(1)))) as 1 | 2 | 3 | 4 | 5 } : {}),
-        ...(isBullet ? { bullet: true } : {}),
-        runs: [],
-      };
+    if (node.nodeType !== Node.ELEMENT_NODE) return;
+
+    const el = node as HTMLElement;
+    const tag = el.tagName.toLowerCase();
+
+    // 1. Lists: UL or OL
+    if (tag === 'ul' || tag === 'ol') {
       for (const child of Array.from(el.childNodes)) {
-        processTextAndInline(child, block);
+        if (child.nodeType === Node.ELEMENT_NODE && (child as HTMLElement).tagName.toLowerCase() === 'li') {
+          const runs = parseRunsFromNodes([child], container);
+          if (runs.length > 0 && runs.some((r) => r.text.trim())) {
+            blocks.push({ bullet: true, runs });
+          }
+        } else if (
+          child.nodeType === Node.ELEMENT_NODE &&
+          ['ul', 'ol'].includes((child as HTMLElement).tagName.toLowerCase())
+        ) {
+          processBlockNode(child);
+        } else {
+          const runs = parseRunsFromNodes([child], container);
+          if (runs.length > 0 && runs.some((r) => r.text.trim())) {
+            blocks.push({ bullet: true, runs });
+          }
+        }
       }
-      if (block.runs.length > 0 && block.runs.some(r => r.text.trim())) {
-        blocks.push(block);
+      return;
+    }
+
+    // 2. Standalone LI
+    if (tag === 'li') {
+      const runs = parseRunsFromNodes([el], container);
+      if (runs.length > 0 && runs.some((r) => r.text.trim())) {
+        blocks.push({ bullet: true, runs });
       }
+      return;
+    }
+
+    // 3. Headings
+    if (/^h[1-6]$/.test(tag)) {
+      const level = Math.min(5, Math.max(1, Number(tag.slice(1)))) as 1 | 2 | 3 | 4 | 5;
+      const runs = parseRunsFromNodes([el], container);
+      if (runs.length > 0 && runs.some((r) => r.text.trim())) {
+        blocks.push({ heading: true, headingLevel: level, runs });
+      }
+      return;
+    }
+
+    // 4. Containers like P or DIV that contain block descendants (e.g. UL inside P or DIV)
+    if (hasBlockDescendant(el)) {
+      let inlineGroup: Node[] = [];
+      const flushInline = () => {
+        if (inlineGroup.length > 0) {
+          const runs = parseRunsFromNodes(inlineGroup, container);
+          if (runs.length > 0 && runs.some((r) => r.text.trim())) {
+            blocks.push({ runs });
+          }
+          inlineGroup = [];
+        }
+      };
+
+      for (const child of Array.from(el.childNodes)) {
+        if (child.nodeType === Node.ELEMENT_NODE && isBlockTag((child as HTMLElement).tagName.toLowerCase())) {
+          flushInline();
+          processBlockNode(child);
+        } else {
+          inlineGroup.push(child);
+        }
+      }
+      flushInline();
+      return;
+    }
+
+    // 5. Standard paragraph / div
+    const runs = parseRunsFromNodes([el], container);
+    if (runs.length > 0 && runs.some((r) => r.text.trim())) {
+      blocks.push({ runs });
     }
   }
+
+  let inlineGroup: Node[] = [];
+  const flushInline = () => {
+    if (inlineGroup.length > 0) {
+      const runs = parseRunsFromNodes(inlineGroup, container);
+      if (runs.length > 0 && runs.some((r) => r.text.trim())) {
+        blocks.push({ runs });
+      }
+      inlineGroup = [];
+    }
+  };
+
+  for (const child of Array.from(container.childNodes)) {
+    if (child.nodeType === Node.ELEMENT_NODE && isBlockTag((child as HTMLElement).tagName.toLowerCase())) {
+      flushInline();
+      processBlockNode(child);
+    } else {
+      inlineGroup.push(child);
+    }
+  }
+  flushInline();
 
   return blocks;
 }
@@ -236,11 +357,22 @@ export const QuotationDetailsPreview: FC<{ blocks: QuotationBlock[]; className?:
   const flushBullets = (keyIdx: number) => {
     if (currentBullets.length === 0) return;
     elements.push(
-      <ul key={`ul-${keyIdx}`} className="my-2 list-disc space-y-1 pl-5 text-sm text-gray-700">
+      <ul
+        key={`ul-${keyIdx}`}
+        className="my-3 list-disc space-y-1.5 pl-6 text-sm text-gray-700"
+        style={{ listStyleType: 'disc' }}
+      >
         {currentBullets.map((b, bIdx) => (
-          <li key={bIdx} className="leading-relaxed">
+          <li key={bIdx} className="leading-relaxed pl-1">
             {(b.runs || []).map((r, rIdx) => {
-              let textEl: JSX.Element = <span key={rIdx} style={r.fontSize ? { fontSize: `${r.fontSize}px` } : undefined}>{r.text}</span>;
+              let textEl: JSX.Element = (
+                <span
+                  key={rIdx}
+                  style={r.fontSize ? { fontSize: `${r.fontSize}px` } : undefined}
+                >
+                  {r.text}
+                </span>
+              );
               if (r.underline) textEl = <u key={rIdx}>{textEl}</u>;
               if (r.italic) textEl = <em key={rIdx}>{textEl}</em>;
               if (r.bold) textEl = <strong key={rIdx} className="font-semibold text-gray-900">{textEl}</strong>;
@@ -268,7 +400,14 @@ export const QuotationDetailsPreview: FC<{ blocks: QuotationBlock[]; className?:
             className={`${headingClassNames[headingLevel]} mt-4 mb-2 font-bold text-sky-950 first:mt-0 tracking-tight`}
           >
             {(block.runs || []).map((r, rIdx) => {
-              let textEl: JSX.Element = <span key={rIdx} style={r.fontSize ? { fontSize: `${r.fontSize}px` } : undefined}>{r.text}</span>;
+              let textEl: JSX.Element = (
+                <span
+                  key={rIdx}
+                  style={r.fontSize ? { fontSize: `${r.fontSize}px` } : undefined}
+                >
+                  {r.text}
+                </span>
+              );
               if (r.underline) textEl = <u key={rIdx}>{textEl}</u>;
               if (r.italic) textEl = <em key={rIdx}>{textEl}</em>;
               if (r.bold) textEl = <strong key={rIdx}>{textEl}</strong>;
@@ -280,7 +419,14 @@ export const QuotationDetailsPreview: FC<{ blocks: QuotationBlock[]; className?:
         elements.push(
           <p key={`p-${idx}`} className="my-2 text-sm leading-relaxed text-gray-700">
             {(block.runs || []).map((r, rIdx) => {
-              let textEl: JSX.Element = <span key={rIdx} style={r.fontSize ? { fontSize: `${r.fontSize}px` } : undefined}>{r.text}</span>;
+              let textEl: JSX.Element = (
+                <span
+                  key={rIdx}
+                  style={r.fontSize ? { fontSize: `${r.fontSize}px` } : undefined}
+                >
+                  {r.text}
+                </span>
+              );
               if (r.underline) textEl = <u key={rIdx}>{textEl}</u>;
               if (r.italic) textEl = <em key={rIdx}>{textEl}</em>;
               if (r.bold) textEl = <strong key={rIdx} className="font-semibold text-gray-900">{textEl}</strong>;
@@ -333,23 +479,51 @@ export function QuotationDetailsEditor({
       const rawBlock = String(document.queryCommandValue('formatBlock') || '').toLowerCase();
       const blockMatch = rawBlock.match(/h([1-5])/);
       let selectedFontSize: number | null = null;
-      let selectionElement = selection.focusNode instanceof HTMLElement
-        ? selection.focusNode
-        : selection.focusNode?.parentElement;
-      while (selectionElement && selectionElement !== editorRef.current) {
-        const inlineSize = Number.parseFloat(selectionElement.style.fontSize);
-        if (Number.isFinite(inlineSize)) {
-          selectedFontSize = Math.round(inlineSize);
-          break;
+      let isInsideUnorderedList = false;
+      let isInsideOrderedList = false;
+
+      let node: Node | null = selection.anchorNode;
+      while (node && node !== editorRef.current) {
+        if (node.nodeType === Node.ELEMENT_NODE) {
+          const el = node as HTMLElement;
+          const tag = el.tagName.toLowerCase();
+          if (tag === 'ul') isInsideUnorderedList = true;
+          if (tag === 'ol') isInsideOrderedList = true;
+          if (tag === 'li') {
+            const parentTag = el.parentElement?.tagName.toLowerCase();
+            if (parentTag === 'ol') isInsideOrderedList = true;
+            else isInsideUnorderedList = true;
+          }
+          if (selectedFontSize === null) {
+            const inlineSize = Number.parseFloat(el.style.fontSize);
+            if (Number.isFinite(inlineSize) && inlineSize > 0) {
+              selectedFontSize = Math.round(inlineSize);
+            }
+          }
         }
-        selectionElement = selectionElement.parentElement;
+        node = node.parentNode;
       }
+
+      if (!isInsideUnorderedList && !isInsideOrderedList) {
+        isInsideUnorderedList = document.queryCommandState('insertUnorderedList');
+        isInsideOrderedList = document.queryCommandState('insertOrderedList');
+      }
+
+      const activeBlockType: ActiveFormats['block'] = isInsideOrderedList
+        ? 'ol'
+        : isInsideUnorderedList
+        ? 'ul'
+        : blockMatch
+        ? (`h${blockMatch[1]}` as ActiveFormats['block'])
+        : 'p';
+
       setActiveFormats({
-        block: blockMatch ? (`h${blockMatch[1]}` as ActiveFormats['block']) : 'p',
+        block: activeBlockType,
         bold: document.queryCommandState('bold'),
         italic: document.queryCommandState('italic'),
         underline: document.queryCommandState('underline'),
-        list: document.queryCommandState('insertUnorderedList'),
+        list: isInsideUnorderedList,
+        orderedList: isInsideOrderedList,
         fontSize: selectedFontSize,
       });
     }
@@ -388,20 +562,68 @@ export function QuotationDetailsEditor({
   };
 
   const applyFontSize = (fontSize: number) => {
-    if (editorRef.current) editorRef.current.focus();
+    if (editorRef.current) {
+      editorRef.current.focus();
+    }
     if (savedSelectionRef.current) {
       const selection = window.getSelection();
       selection?.removeAllRanges();
       selection?.addRange(savedSelectionRef.current);
     }
+
+    const selection = window.getSelection();
+    if (!selection || !editorRef.current) return;
+
+    // If selection is collapsed, expand to current word for instant feedback
+    if (selection.isCollapsed && selection.rangeCount > 0) {
+      const range = selection.getRangeAt(0);
+      const containerNode = range.startContainer;
+      if (containerNode.nodeType === Node.TEXT_NODE && containerNode.textContent) {
+        const text = containerNode.textContent;
+        const offset = range.startOffset;
+        let start = offset;
+        while (start > 0 && !/\s/.test(text[start - 1])) start--;
+        let end = offset;
+        while (end < text.length && !/\s/.test(text[end])) end++;
+        if (start < end) {
+          range.setStart(containerNode, start);
+          range.setEnd(containerNode, end);
+          selection.removeAllRanges();
+          selection.addRange(range);
+          savedSelectionRef.current = range.cloneRange();
+        }
+      }
+    }
+
+    document.execCommand('styleWithCSS', false, 'false');
     document.execCommand('fontSize', false, '7');
-    editorRef.current?.querySelectorAll('font[size="7"]').forEach((node) => {
+
+    const fontNodes = editorRef.current.querySelectorAll('font[size="7"]');
+    fontNodes.forEach((node) => {
       const element = node as HTMLElement;
       element.removeAttribute('size');
       element.style.fontSize = `${fontSize}px`;
+      element.querySelectorAll('*').forEach((child) => {
+        if ((child as HTMLElement).style?.fontSize) {
+          (child as HTMLElement).style.fontSize = '';
+        }
+      });
     });
+
     syncChanges();
     rememberSelection();
+  };
+
+  const increaseFontSize = () => {
+    const current = activeFormats.fontSize || 14;
+    const nextSize = FONT_SIZES.find((s) => s > current) || FONT_SIZES[FONT_SIZES.length - 1];
+    applyFontSize(nextSize);
+  };
+
+  const decreaseFontSize = () => {
+    const current = activeFormats.fontSize || 14;
+    const prevSize = [...FONT_SIZES].reverse().find((s) => s < current) || FONT_SIZES[0];
+    applyFontSize(prevSize);
   };
 
   const formatButtonClass = (active: boolean) =>
@@ -447,7 +669,9 @@ export function QuotationDetailsEditor({
           <div className="inline-flex rounded-lg border border-gray-200 bg-white p-0.5 text-xs">
             <button
               type="button"
-              onClick={() => setViewMode('edit')}
+              onClick={() => {
+                setViewMode('edit');
+              }}
               className={`flex items-center gap-1.5 px-3 py-1 rounded-md font-medium transition-colors ${
                 viewMode === 'edit'
                   ? 'bg-sky-700 text-white shadow-xs'
@@ -458,7 +682,10 @@ export function QuotationDetailsEditor({
             </button>
             <button
               type="button"
-              onClick={() => setViewMode('preview')}
+              onClick={() => {
+                syncChanges();
+                setViewMode('preview');
+              }}
               className={`flex items-center gap-1.5 px-3 py-1 rounded-md font-medium transition-colors ${
                 viewMode === 'preview'
                   ? 'bg-sky-700 text-white shadow-xs'
@@ -485,10 +712,27 @@ export function QuotationDetailsEditor({
               id="quotation-heading-style"
               aria-label="Text style"
               value={activeFormats.block}
-              onChange={(event) => executeCommand('formatBlock', event.target.value)}
-              className="h-9 min-w-[150px] rounded-lg border border-gray-200 bg-white px-3 font-medium text-gray-700 outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-500/15"
+              onChange={(event) => {
+                const val = event.target.value;
+                if (val === 'ul') {
+                  if (!activeFormats.list) executeCommand('insertUnorderedList');
+                } else if (val === 'ol') {
+                  if (!activeFormats.orderedList) executeCommand('insertOrderedList');
+                } else {
+                  if (activeFormats.list) {
+                    executeCommand('insertUnorderedList');
+                  }
+                  if (activeFormats.orderedList) {
+                    executeCommand('insertOrderedList');
+                  }
+                  executeCommand('formatBlock', val);
+                }
+              }}
+              className="h-9 min-w-[155px] rounded-lg border border-gray-200 bg-white px-3 font-medium text-gray-700 outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-500/15"
             >
               <option value="p">Paragraph</option>
+              <option value="ul">• Bullet list</option>
+              <option value="ol">1. Numbered list</option>
               <option value="h1">Heading 1 — Main title</option>
               <option value="h2">Heading 2 — Section</option>
               <option value="h3">Heading 3</option>
@@ -496,69 +740,101 @@ export function QuotationDetailsEditor({
               <option value="h5">Heading 5</option>
             </select>
 
+            <span className="mx-0.5 h-6 w-px shrink-0 bg-gray-200" />
+
+            {/* Decrease font size button (A-) */}
+            <button
+              type="button"
+              title="Decrease font size (A-)"
+              aria-label="Decrease font size"
+              onClick={decreaseFontSize}
+              className="inline-flex min-h-9 items-center justify-center rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 font-bold text-gray-700 transition-colors hover:border-sky-300 hover:bg-sky-50"
+            >
+              <span className="text-xs leading-none">A-</span>
+            </button>
+
+            {/* Font size dropdown */}
             <label className="sr-only" htmlFor="quotation-font-size">Font size</label>
             <select
               id="quotation-font-size"
               aria-label="Font size"
               value={activeFormats.fontSize ?? ''}
               onChange={(event) => applyFontSize(Number(event.target.value))}
-              className="h-9 min-w-[105px] rounded-lg border border-gray-200 bg-white px-3 font-medium text-gray-700 outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-500/15"
+              className="h-9 min-w-[95px] rounded-lg border border-gray-200 bg-white px-2.5 font-medium text-gray-700 outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-500/15"
             >
               <option value="" disabled>Font size</option>
-              {FONT_SIZES.map((size) => <option key={size} value={size}>{size} px</option>)}
+              {FONT_SIZES.map((size) => (
+                <option key={size} value={size}>
+                  {size} px
+                </option>
+              ))}
             </select>
+
+            {/* Increase font size button (A+) */}
+            <button
+              type="button"
+              title="Increase font size (A+)"
+              aria-label="Increase font size"
+              onClick={increaseFontSize}
+              className="inline-flex min-h-9 items-center justify-center rounded-lg border border-gray-200 bg-white px-2.5 py-1.5 font-bold text-gray-700 transition-colors hover:border-sky-300 hover:bg-sky-50"
+            >
+              <span className="text-xs leading-none">A+</span>
+            </button>
 
             <span className="mx-0.5 h-6 w-px shrink-0 bg-gray-200" />
             <button type="button" title="Bold (Ctrl+B)" aria-label="Bold" aria-pressed={activeFormats.bold} onClick={() => executeCommand('bold')} className={formatButtonClass(activeFormats.bold)}><Bold size={15} /></button>
             <button type="button" title="Italic (Ctrl+I)" aria-label="Italic" aria-pressed={activeFormats.italic} onClick={() => executeCommand('italic')} className={formatButtonClass(activeFormats.italic)}><Italic size={15} /></button>
             <button type="button" title="Underline (Ctrl+U)" aria-label="Underline" aria-pressed={activeFormats.underline} onClick={() => executeCommand('underline')} className={formatButtonClass(activeFormats.underline)}><Underline size={15} /></button>
             <button type="button" title="Bullet list" aria-label="Bullet list" aria-pressed={activeFormats.list} onClick={() => executeCommand('insertUnorderedList')} className={formatButtonClass(activeFormats.list)}><List size={15} /></button>
+            <button type="button" title="Numbered list" aria-label="Numbered list" aria-pressed={activeFormats.orderedList} onClick={() => executeCommand('insertOrderedList')} className={formatButtonClass(activeFormats.orderedList)}><ListOrdered size={15} /></button>
 
             <span className="mx-0.5 h-6 w-px shrink-0 bg-gray-200" />
             <button type="button" title="Undo (Ctrl+Z)" aria-label="Undo" onClick={() => executeCommand('undo')} className={formatButtonClass(false)}><Undo2 size={15} /></button>
             <button type="button" title="Redo (Ctrl+Y)" aria-label="Redo" onClick={() => executeCommand('redo')} className={formatButtonClass(false)}><Redo2 size={15} /></button>
             <button type="button" title="Clear all text" aria-label="Clear all text" onClick={clearContent} className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg border border-red-200 bg-white px-2.5 py-1.5 font-medium text-red-600 transition-colors hover:bg-red-50"><Trash2 size={15} /><span>Clear all</span></button>
           </div>
-
         </div>
       )}
 
       {/* Editor Content Area */}
       <div className="p-4">
-        {viewMode === 'edit' ? (
-          <div className="relative">
-            <div
-              ref={editorRef}
-              contentEditable
-              suppressContentEditableWarning
-              dir="ltr"
-              spellCheck
-              onInput={() => {
-                rememberSelection();
-                if (!isComposingRef.current) syncChanges();
-              }}
-              onKeyUp={rememberSelection}
-              onMouseUp={rememberSelection}
-              onCompositionStart={() => {
-                isComposingRef.current = true;
-              }}
-              onCompositionEnd={() => {
-                isComposingRef.current = false;
-                rememberSelection();
-                syncChanges();
-              }}
-              onBlur={syncChanges}
-              onFocus={rememberSelection}
-              data-placeholder={placeholder}
-              aria-label="Quotation details text editor"
-              className="min-h-[280px] max-h-[560px] overflow-y-auto rounded-lg border border-gray-300 bg-white p-5 text-left text-sm leading-relaxed text-gray-800 outline-none transition-all empty:before:pointer-events-none empty:before:text-gray-400 empty:before:content-[attr(data-placeholder)] focus:border-sky-600 focus:ring-2 focus:ring-sky-500/15 [&_h1]:mb-3 [&_h1]:mt-5 [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:text-sky-950 [&_h2]:mb-2 [&_h2]:mt-4 [&_h2]:text-xl [&_h2]:font-bold [&_h2]:text-sky-950 [&_h3]:my-3 [&_h3]:text-lg [&_h3]:font-bold [&_h3]:text-sky-950 [&_h4]:my-2.5 [&_h4]:text-base [&_h4]:font-bold [&_h4]:text-sky-950 [&_h5]:my-2 [&_h5]:text-sm [&_h5]:font-bold [&_h5]:text-sky-950 [&_li]:my-1 [&_p]:my-2 [&_ul]:my-3 [&_ul]:list-disc [&_ul]:pl-6"
-            />
-          </div>
-        ) : (
-          <div className="min-h-[220px] max-h-[500px] overflow-y-auto rounded-lg border border-gray-100 bg-gray-50/50 p-4">
-            <QuotationDetailsPreview blocks={value} />
-          </div>
-        )}
+        <div className={viewMode === 'edit' ? 'relative' : 'hidden'}>
+          <div
+            ref={editorRef}
+            contentEditable
+            suppressContentEditableWarning
+            dir="ltr"
+            spellCheck
+            onInput={() => {
+              rememberSelection();
+              if (!isComposingRef.current) syncChanges();
+            }}
+            onKeyUp={rememberSelection}
+            onMouseUp={rememberSelection}
+            onCompositionStart={() => {
+              isComposingRef.current = true;
+            }}
+            onCompositionEnd={() => {
+              isComposingRef.current = false;
+              rememberSelection();
+              syncChanges();
+            }}
+            onBlur={syncChanges}
+            onFocus={rememberSelection}
+            data-placeholder={placeholder}
+            aria-label="Quotation details text editor"
+            className="min-h-[280px] max-h-[560px] overflow-y-auto rounded-lg border border-gray-300 bg-white p-5 text-left text-sm leading-relaxed text-gray-800 outline-none transition-all empty:before:pointer-events-none empty:before:text-gray-400 empty:before:content-[attr(data-placeholder)] focus:border-sky-600 focus:ring-2 focus:ring-sky-500/15 [&_h1]:mb-3 [&_h1]:mt-5 [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:text-sky-950 [&_h2]:mb-2 [&_h2]:mt-4 [&_h2]:text-xl [&_h2]:font-bold [&_h2]:text-sky-950 [&_h3]:my-3 [&_h3]:text-lg [&_h3]:font-bold [&_h3]:text-sky-950 [&_h4]:my-2.5 [&_h4]:text-base [&_h4]:font-bold [&_h4]:text-sky-950 [&_h5]:my-2 [&_h5]:text-sm [&_h5]:font-bold [&_h5]:text-sky-950 [&_li]:my-1.5 [&_p]:my-2 [&_ul]:my-3 [&_ul]:list-disc [&_ul]:pl-6 [&_ol]:my-3 [&_ol]:list-decimal [&_ol]:pl-6"
+          />
+        </div>
+        <div
+          className={
+            viewMode === 'preview'
+              ? 'min-h-[220px] max-h-[500px] overflow-y-auto rounded-lg border border-gray-100 bg-gray-50/50 p-4'
+              : 'hidden'
+          }
+        >
+          <QuotationDetailsPreview blocks={value} />
+        </div>
       </div>
 
       {/* Footer Info */}
