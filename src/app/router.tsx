@@ -21,7 +21,6 @@ const AttendancePage = lazy(() => import('@/features/time-tracking/pages/Attenda
 const TimeAdjustmentRequestsPage = lazy(() => import('@/features/time-tracking/pages/TimeAdjustmentRequestsPage').then((m) => ({ default: m.TimeAdjustmentRequestsPage })));
 const GeofencingPage = lazy(() => import('@/features/geofencing/pages/GeofencingPage').then((m) => ({ default: m.GeofencingPage })));
 const ReportsPage = lazy(() => import('@/features/reports/pages/ReportsPage').then((m) => ({ default: m.ReportsPage })));
-const QuoteLibraryPage = lazy(() => import('@/features/quotes/pages/QuoteLibraryPage').then((m) => ({ default: m.QuoteLibraryPage })));
 const QuoteLibraryV2Page = lazy(() => import('@/features/quotes/pages/QuoteLibraryV2Page').then((m) => ({ default: m.QuoteLibraryV2Page })));
 const ChatPage = lazy(() => import('@/features/chat/pages/ChatPage').then((m) => ({ default: m.ChatPage })));
 const InventoryPage = lazy(() => import('@/features/inventory/pages/InventoryPage').then((m) => ({ default: m.InventoryPage })));
@@ -105,7 +104,7 @@ export function AppRouter() {
                     <Route path={ROUTES.GEOFENCING} element={<GeofencingPage />} />
                     <Route path={ROUTES.REPORTS} element={<ReportsPage />} />
                     <Route path={ROUTES.EXPENSES} element={<ExpensesPage />} />
-                    <Route path={ROUTES.QUOTES} element={<QuoteLibraryPage />} />
+                    <Route path={ROUTES.QUOTES} element={<Navigate to={ROUTES.QUOTES_V2} replace />} />
                     <Route path={ROUTES.QUOTES_V2} element={<QuoteLibraryV2Page />} />
                     <Route path={ROUTES.CHAT} element={<ChatPage />} />
                     <Route path={ROUTES.INVENTORY} element={<InventoryPage />} />

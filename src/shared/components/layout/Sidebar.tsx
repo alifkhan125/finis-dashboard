@@ -42,8 +42,7 @@ const menuItems = [
     section: 'Financial',
     items: [
       { icon: FileBarChart, label: 'Reports', path: '/reports' },
-      { icon: ScrollText, label: 'Quotes Library', path: '/quotes' },
-      { icon: ScrollText, label: 'Quotation Library V2', path: '/quotes-v2' },
+      { icon: ScrollText, label: 'Quotation Library', path: '/quotes-v2' },
       { icon: DollarSign, label: 'Expenses', path: '/expenses' }
     ]
   },

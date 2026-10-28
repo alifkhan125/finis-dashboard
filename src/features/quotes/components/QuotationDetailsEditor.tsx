@@ -3,15 +3,14 @@ import {
   Bold,
   Italic,
   Underline,
-  Heading1,
-  Heading2,
   List,
-  Type,
   FileText,
   Trash2,
   Eye,
   Edit3,
   Check,
+  Undo2,
+  Redo2,
 } from 'lucide-react';
 
 export type QuotationTextRun = {
@@ -19,12 +18,13 @@ export type QuotationTextRun = {
   bold?: boolean;
   italic?: boolean;
   underline?: boolean;
+  fontSize?: number;
 };
 
 export type QuotationBlock = {
   runs: QuotationTextRun[];
   heading?: boolean;
-  headingLevel?: 1 | 2;
+  headingLevel?: 1 | 2 | 3 | 4 | 5;
   bullet?: boolean;
 };
 
@@ -36,11 +36,12 @@ export interface QuotationDetailsEditorProps {
 }
 
 type ActiveFormats = {
-  block: 'h1' | 'h2' | 'p';
+  block: 'h1' | 'h2' | 'h3' | 'h4' | 'h5' | 'p';
   bold: boolean;
   italic: boolean;
   underline: boolean;
   list: boolean;
+  fontSize: number | null;
 };
 
 const DEFAULT_FORMATS: ActiveFormats = {
@@ -49,6 +50,17 @@ const DEFAULT_FORMATS: ActiveFormats = {
   italic: false,
   underline: false,
   list: false,
+  fontSize: null,
+};
+
+const FONT_SIZES = [10, 12, 14, 16, 18, 20, 24, 28, 32];
+
+const headingClassNames: Record<1 | 2 | 3 | 4 | 5, string> = {
+  1: 'text-2xl',
+  2: 'text-xl',
+  3: 'text-lg',
+  4: 'text-base',
+  5: 'text-sm',
 };
 
 function escapeHtml(str: string): string {
@@ -75,6 +87,7 @@ export function quotationBlocksToHtml(blocks: QuotationBlock[]): string {
         if (run.bold) runHtml = `<strong>${runHtml}</strong>`;
         if (run.italic) runHtml = `<em>${runHtml}</em>`;
         if (run.underline) runHtml = `<u>${runHtml}</u>`;
+        if (run.fontSize) runHtml = `<span style="font-size:${run.fontSize}px">${runHtml}</span>`;
         html += runHtml;
       }
       html += '</li>';
@@ -83,13 +96,15 @@ export function quotationBlocksToHtml(blocks: QuotationBlock[]): string {
         html += '</ul>';
         inList = false;
       }
-      const tag = block.heading ? (block.headingLevel === 1 ? 'h1' : 'h2') : 'p';
+      const headingLevel = Math.min(5, Math.max(1, block.headingLevel ?? 2));
+      const tag = block.heading ? `h${headingLevel}` : 'p';
       html += `<${tag}>`;
       for (const run of block.runs || []) {
         let runHtml = escapeHtml(run.text || '');
         if (run.bold) runHtml = `<strong>${runHtml}</strong>`;
         if (run.italic) runHtml = `<em>${runHtml}</em>`;
         if (run.underline) runHtml = `<u>${runHtml}</u>`;
+        if (run.fontSize) runHtml = `<span style="font-size:${run.fontSize}px">${runHtml}</span>`;
         html += runHtml;
       }
       html += `</${tag}>`;
@@ -112,6 +127,7 @@ export function htmlToQuotationBlocks(container: HTMLElement): QuotationBlock[] 
       let bold = false;
       let italic = false;
       let underline = false;
+      let fontSize: number | undefined;
       let parent = node.parentElement;
 
       while (parent && parent !== container) {
@@ -130,6 +146,8 @@ export function htmlToQuotationBlocks(container: HTMLElement): QuotationBlock[] 
         if (tag === 'u' || (parent.style.textDecoration && parent.style.textDecoration.includes('underline'))) {
           underline = true;
         }
+        const inlineSize = Number.parseFloat(parent.style.fontSize);
+        if (Number.isFinite(inlineSize)) fontSize = Math.round(inlineSize);
         parent = parent.parentElement;
       }
 
@@ -138,6 +156,7 @@ export function htmlToQuotationBlocks(container: HTMLElement): QuotationBlock[] 
         ...(bold ? { bold: true } : {}),
         ...(italic ? { italic: true } : {}),
         ...(underline ? { underline: true } : {}),
+        ...(fontSize ? { fontSize } : {}),
       });
     } else if (node.nodeType === Node.ELEMENT_NODE) {
       const el = node as HTMLElement;
@@ -187,7 +206,7 @@ export function htmlToQuotationBlocks(container: HTMLElement): QuotationBlock[] 
       const isBullet = tag === 'li';
       const block: QuotationBlock = {
         ...(isHeading ? { heading: true } : {}),
-        ...(isHeading ? { headingLevel: tag === 'h1' ? 1 as const : 2 as const } : {}),
+        ...(isHeading ? { headingLevel: Math.min(5, Math.max(1, Number(tag.slice(1)))) as 1 | 2 | 3 | 4 | 5 } : {}),
         ...(isBullet ? { bullet: true } : {}),
         runs: [],
       };
@@ -221,7 +240,7 @@ export const QuotationDetailsPreview: FC<{ blocks: QuotationBlock[]; className?:
         {currentBullets.map((b, bIdx) => (
           <li key={bIdx} className="leading-relaxed">
             {(b.runs || []).map((r, rIdx) => {
-              let textEl: JSX.Element = <span key={rIdx}>{r.text}</span>;
+              let textEl: JSX.Element = <span key={rIdx} style={r.fontSize ? { fontSize: `${r.fontSize}px` } : undefined}>{r.text}</span>;
               if (r.underline) textEl = <u key={rIdx}>{textEl}</u>;
               if (r.italic) textEl = <em key={rIdx}>{textEl}</em>;
               if (r.bold) textEl = <strong key={rIdx} className="font-semibold text-gray-900">{textEl}</strong>;
@@ -240,26 +259,28 @@ export const QuotationDetailsPreview: FC<{ blocks: QuotationBlock[]; className?:
     } else {
       flushBullets(idx);
       if (block.heading) {
-        const HeadingTag = block.headingLevel === 1 ? 'h2' : 'h3';
+        const headingLevel = Math.min(5, Math.max(1, block.headingLevel ?? 2)) as 1 | 2 | 3 | 4 | 5;
         elements.push(
-          <HeadingTag
+          <div
             key={`h-${idx}`}
-            className={`${block.headingLevel === 1 ? 'text-xl' : 'text-base'} mt-4 mb-2 font-bold text-sky-950 first:mt-0 tracking-tight`}
+            role="heading"
+            aria-level={headingLevel}
+            className={`${headingClassNames[headingLevel]} mt-4 mb-2 font-bold text-sky-950 first:mt-0 tracking-tight`}
           >
             {(block.runs || []).map((r, rIdx) => {
-              let textEl: JSX.Element = <span key={rIdx}>{r.text}</span>;
+              let textEl: JSX.Element = <span key={rIdx} style={r.fontSize ? { fontSize: `${r.fontSize}px` } : undefined}>{r.text}</span>;
               if (r.underline) textEl = <u key={rIdx}>{textEl}</u>;
               if (r.italic) textEl = <em key={rIdx}>{textEl}</em>;
               if (r.bold) textEl = <strong key={rIdx}>{textEl}</strong>;
               return textEl;
             })}
-          </HeadingTag>
+          </div>
         );
       } else {
         elements.push(
           <p key={`p-${idx}`} className="my-2 text-sm leading-relaxed text-gray-700">
             {(block.runs || []).map((r, rIdx) => {
-              let textEl: JSX.Element = <span key={rIdx}>{r.text}</span>;
+              let textEl: JSX.Element = <span key={rIdx} style={r.fontSize ? { fontSize: `${r.fontSize}px` } : undefined}>{r.text}</span>;
               if (r.underline) textEl = <u key={rIdx}>{textEl}</u>;
               if (r.italic) textEl = <em key={rIdx}>{textEl}</em>;
               if (r.bold) textEl = <strong key={rIdx} className="font-semibold text-gray-900">{textEl}</strong>;
@@ -310,12 +331,26 @@ export function QuotationDetailsEditor({
     if (editorRef.current.contains(range.commonAncestorContainer)) {
       savedSelectionRef.current = range.cloneRange();
       const rawBlock = String(document.queryCommandValue('formatBlock') || '').toLowerCase();
+      const blockMatch = rawBlock.match(/h([1-5])/);
+      let selectedFontSize: number | null = null;
+      let selectionElement = selection.focusNode instanceof HTMLElement
+        ? selection.focusNode
+        : selection.focusNode?.parentElement;
+      while (selectionElement && selectionElement !== editorRef.current) {
+        const inlineSize = Number.parseFloat(selectionElement.style.fontSize);
+        if (Number.isFinite(inlineSize)) {
+          selectedFontSize = Math.round(inlineSize);
+          break;
+        }
+        selectionElement = selectionElement.parentElement;
+      }
       setActiveFormats({
-        block: rawBlock.includes('h1') ? 'h1' : rawBlock.includes('h2') ? 'h2' : 'p',
+        block: blockMatch ? (`h${blockMatch[1]}` as ActiveFormats['block']) : 'p',
         bold: document.queryCommandState('bold'),
         italic: document.queryCommandState('italic'),
         underline: document.queryCommandState('underline'),
         list: document.queryCommandState('insertUnorderedList'),
+        fontSize: selectedFontSize,
       });
     }
   };
@@ -352,11 +387,28 @@ export function QuotationDetailsEditor({
     rememberSelection();
   };
 
-  const formatButtonClass = (active: boolean, compact = false) =>
-    `${compact ? 'p-1.5' : 'px-2 py-1'} rounded-md border transition-colors ${
+  const applyFontSize = (fontSize: number) => {
+    if (editorRef.current) editorRef.current.focus();
+    if (savedSelectionRef.current) {
+      const selection = window.getSelection();
+      selection?.removeAllRanges();
+      selection?.addRange(savedSelectionRef.current);
+    }
+    document.execCommand('fontSize', false, '7');
+    editorRef.current?.querySelectorAll('font[size="7"]').forEach((node) => {
+      const element = node as HTMLElement;
+      element.removeAttribute('size');
+      element.style.fontSize = `${fontSize}px`;
+    });
+    syncChanges();
+    rememberSelection();
+  };
+
+  const formatButtonClass = (active: boolean) =>
+    `inline-flex min-h-9 items-center justify-center gap-1.5 rounded-lg border px-2.5 py-1.5 font-medium transition-colors ${
       active
         ? 'border-sky-700 bg-sky-700 text-white shadow-sm'
-        : 'border-gray-200 text-gray-700 hover:border-gray-300 hover:bg-gray-100'
+        : 'border-gray-200 bg-white text-gray-700 hover:border-sky-300 hover:bg-sky-50'
     }`;
 
   const clearContent = () => {
@@ -422,96 +474,52 @@ export function QuotationDetailsEditor({
       {/* Formatting Toolbar */}
       {viewMode === 'edit' && (
         <div
-          className="flex flex-wrap items-center gap-1 border-b border-gray-100 bg-white px-3 py-2 text-xs"
+          className="border-b border-gray-200 bg-gray-50/70 px-4 py-3 text-xs"
           onMouseDown={(event) => {
             if ((event.target as HTMLElement).closest('button')) event.preventDefault();
           }}
         >
-          <button
-            type="button"
-            title="Heading 1"
-            aria-pressed={activeFormats.block === 'h1'}
-            onClick={() => executeCommand('formatBlock', 'h1')}
-            className={`flex items-center gap-1 ${formatButtonClass(activeFormats.block === 'h1')}`}
-          >
-            <Heading1 size={14} />
-            <span className="text-[11px] font-semibold">H1</span>
-          </button>
-          <button
-            type="button"
-            title="Heading 2"
-            aria-pressed={activeFormats.block === 'h2'}
-            onClick={() => executeCommand('formatBlock', 'h2')}
-            className={`flex items-center gap-1 ${formatButtonClass(activeFormats.block === 'h2')}`}
-          >
-            <Heading2 size={14} />
-            <span className="text-[11px] font-semibold">H2</span>
-          </button>
-          <button
-            type="button"
-            title="Normal Paragraph"
-            aria-pressed={activeFormats.block === 'p'}
-            onClick={() => executeCommand('formatBlock', 'p')}
-            className={`flex items-center gap-1 ${formatButtonClass(activeFormats.block === 'p')}`}
-          >
-            <Type size={14} />
-            <span className="text-[11px]">Normal</span>
-          </button>
-
-          <span className="h-4 w-px bg-gray-200 mx-1" />
-
-          <button
-            type="button"
-            title="Bold (Ctrl+B)"
-            aria-pressed={activeFormats.bold}
-            onClick={() => executeCommand('bold')}
-            className={formatButtonClass(activeFormats.bold, true)}
-          >
-            <Bold size={14} />
-          </button>
-          <button
-            type="button"
-            title="Italic (Ctrl+I)"
-            aria-pressed={activeFormats.italic}
-            onClick={() => executeCommand('italic')}
-            className={formatButtonClass(activeFormats.italic, true)}
-          >
-            <Italic size={14} />
-          </button>
-          <button
-            type="button"
-            title="Underline (Ctrl+U)"
-            aria-pressed={activeFormats.underline}
-            onClick={() => executeCommand('underline')}
-            className={formatButtonClass(activeFormats.underline, true)}
-          >
-            <Underline size={14} />
-          </button>
-
-          <span className="h-4 w-px bg-gray-200 mx-1" />
-
-          <button
-            type="button"
-            title="Bullet List"
-            aria-pressed={activeFormats.list}
-            onClick={() => executeCommand('insertUnorderedList')}
-            className={`flex items-center gap-1 ${formatButtonClass(activeFormats.list)}`}
-          >
-            <List size={14} />
-            <span className="text-[11px]">List</span>
-          </button>
-
-          <div className="ml-auto flex items-center gap-2">
-            <button
-              type="button"
-              title="Clear all text"
-              onClick={clearContent}
-              className="flex items-center gap-1 rounded-md text-red-600 hover:bg-red-50 px-2 py-1 transition-colors"
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 whitespace-nowrap">
+            <label className="sr-only" htmlFor="quotation-heading-style">Text style</label>
+            <select
+              id="quotation-heading-style"
+              aria-label="Text style"
+              value={activeFormats.block}
+              onChange={(event) => executeCommand('formatBlock', event.target.value)}
+              className="h-9 min-w-[150px] rounded-lg border border-gray-200 bg-white px-3 font-medium text-gray-700 outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-500/15"
             >
-              <Trash2 size={13} />
-              <span className="text-[11px]">Clear</span>
-            </button>
+              <option value="p">Paragraph</option>
+              <option value="h1">Heading 1 — Main title</option>
+              <option value="h2">Heading 2 — Section</option>
+              <option value="h3">Heading 3</option>
+              <option value="h4">Heading 4</option>
+              <option value="h5">Heading 5</option>
+            </select>
+
+            <label className="sr-only" htmlFor="quotation-font-size">Font size</label>
+            <select
+              id="quotation-font-size"
+              aria-label="Font size"
+              value={activeFormats.fontSize ?? ''}
+              onChange={(event) => applyFontSize(Number(event.target.value))}
+              className="h-9 min-w-[105px] rounded-lg border border-gray-200 bg-white px-3 font-medium text-gray-700 outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-500/15"
+            >
+              <option value="" disabled>Font size</option>
+              {FONT_SIZES.map((size) => <option key={size} value={size}>{size} px</option>)}
+            </select>
+
+            <span className="mx-0.5 h-6 w-px shrink-0 bg-gray-200" />
+            <button type="button" title="Bold (Ctrl+B)" aria-label="Bold" aria-pressed={activeFormats.bold} onClick={() => executeCommand('bold')} className={formatButtonClass(activeFormats.bold)}><Bold size={15} /></button>
+            <button type="button" title="Italic (Ctrl+I)" aria-label="Italic" aria-pressed={activeFormats.italic} onClick={() => executeCommand('italic')} className={formatButtonClass(activeFormats.italic)}><Italic size={15} /></button>
+            <button type="button" title="Underline (Ctrl+U)" aria-label="Underline" aria-pressed={activeFormats.underline} onClick={() => executeCommand('underline')} className={formatButtonClass(activeFormats.underline)}><Underline size={15} /></button>
+            <button type="button" title="Bullet list" aria-label="Bullet list" aria-pressed={activeFormats.list} onClick={() => executeCommand('insertUnorderedList')} className={formatButtonClass(activeFormats.list)}><List size={15} /></button>
+
+            <span className="mx-0.5 h-6 w-px shrink-0 bg-gray-200" />
+            <button type="button" title="Undo (Ctrl+Z)" aria-label="Undo" onClick={() => executeCommand('undo')} className={formatButtonClass(false)}><Undo2 size={15} /></button>
+            <button type="button" title="Redo (Ctrl+Y)" aria-label="Redo" onClick={() => executeCommand('redo')} className={formatButtonClass(false)}><Redo2 size={15} /></button>
+            <button type="button" title="Clear all text" aria-label="Clear all text" onClick={clearContent} className="inline-flex min-h-9 shrink-0 items-center gap-1.5 rounded-lg border border-red-200 bg-white px-2.5 py-1.5 font-medium text-red-600 transition-colors hover:bg-red-50"><Trash2 size={15} /><span>Clear all</span></button>
           </div>
+
         </div>
       )}
 
@@ -542,7 +550,8 @@ export function QuotationDetailsEditor({
               onBlur={syncChanges}
               onFocus={rememberSelection}
               data-placeholder={placeholder}
-              className="min-h-[220px] max-h-[500px] overflow-y-auto rounded-lg border border-gray-200 bg-white p-4 text-left text-sm text-gray-800 leading-relaxed outline-none focus:border-sky-600 focus:ring-2 focus:ring-sky-500/15 transition-all prose-headings:font-bold prose-headings:text-sky-950 prose-h2:text-base prose-h2:mt-3 prose-h2:mb-1 prose-p:my-1.5 prose-ul:my-2 prose-ul:list-disc prose-ul:pl-5 prose-li:my-0.5"
+              aria-label="Quotation details text editor"
+              className="min-h-[280px] max-h-[560px] overflow-y-auto rounded-lg border border-gray-300 bg-white p-5 text-left text-sm leading-relaxed text-gray-800 outline-none transition-all empty:before:pointer-events-none empty:before:text-gray-400 empty:before:content-[attr(data-placeholder)] focus:border-sky-600 focus:ring-2 focus:ring-sky-500/15 [&_h1]:mb-3 [&_h1]:mt-5 [&_h1]:text-2xl [&_h1]:font-bold [&_h1]:text-sky-950 [&_h2]:mb-2 [&_h2]:mt-4 [&_h2]:text-xl [&_h2]:font-bold [&_h2]:text-sky-950 [&_h3]:my-3 [&_h3]:text-lg [&_h3]:font-bold [&_h3]:text-sky-950 [&_h4]:my-2.5 [&_h4]:text-base [&_h4]:font-bold [&_h4]:text-sky-950 [&_h5]:my-2 [&_h5]:text-sm [&_h5]:font-bold [&_h5]:text-sky-950 [&_li]:my-1 [&_p]:my-2 [&_ul]:my-3 [&_ul]:list-disc [&_ul]:pl-6"
             />
           </div>
         ) : (
@@ -553,14 +562,14 @@ export function QuotationDetailsEditor({
       </div>
 
       {/* Footer Info */}
-      <div className="flex items-center justify-between border-t border-gray-100 bg-gray-50/70 px-4 py-2 text-[11px] text-gray-500">
+      <div className="flex flex-wrap items-center justify-between gap-2 border-t border-gray-100 bg-gray-50/70 px-4 py-2.5 text-[11px] text-gray-500">
         <div className="flex items-center gap-3">
           <span>{value.length} block{value.length === 1 ? '' : 's'}</span>
           <span>•</span>
           <span>{totalWords} word{totalWords === 1 ? '' : 's'}</span>
         </div>
-        <span className="text-gray-400">
-          Formatted details are automatically included in the client PDF & email.
+        <span className="text-gray-500">
+          Auto-saved · Included in the client PDF and email
         </span>
       </div>
     </div>

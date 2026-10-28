@@ -14,7 +14,6 @@ import {
   Mail,
   Send,
   Loader2,
-  Sparkles,
   Layers3,
   Plus,
   Pencil,
@@ -284,7 +283,11 @@ function QuotationBuilder({ initialQuote, onOpenSaved, onSaved }: { initialQuote
   const restoredDetails: QuotationBlock[] = Array.isArray(initialQuote?.quotationDetails)
     ? (initialQuote.quotationDetails as QuotationBlock[]).map((block) => ({
         heading: Boolean(block?.heading),
-        ...(block?.heading ? { headingLevel: block.headingLevel === 1 ? 1 as const : 2 as const } : {}),
+        ...(block?.heading ? {
+          headingLevel: ([1, 2, 3, 4, 5].includes(Number(block.headingLevel))
+            ? Number(block.headingLevel)
+            : 2) as 1 | 2 | 3 | 4 | 5,
+        } : {}),
         bullet: Boolean(block?.bullet),
         runs: Array.isArray(block?.runs)
           ? block.runs.map((run) => ({
@@ -292,6 +295,7 @@ function QuotationBuilder({ initialQuote, onOpenSaved, onSaved }: { initialQuote
               ...(run?.bold ? { bold: true } : {}),
               ...(run?.italic ? { italic: true } : {}),
               ...(run?.underline ? { underline: true } : {}),
+              ...(Number.isFinite(Number(run?.fontSize)) ? { fontSize: Number(run.fontSize) } : {}),
             }))
           : [],
       }))
@@ -415,6 +419,7 @@ function QuotationBuilder({ initialQuote, onOpenSaved, onSaved }: { initialQuote
         ...(r.bold ? { bold: true } : {}),
         ...(r.italic ? { italic: true } : {}),
         ...(r.underline ? { underline: true } : {}),
+        ...(r.fontSize ? { fontSize: r.fontSize } : {}),
       })),
     })),
     floors: selectedFloors.map((floor) => ({
@@ -491,7 +496,7 @@ function QuotationBuilder({ initialQuote, onOpenSaved, onSaved }: { initialQuote
     setSaveMessage(null);
     if (!info.companyId || !info.project.trim() || !info.client.trim()) {
       setSaveMessage({ type: "error", text: "Company, project name and client name are required before saving." });
-      throw new Error("Required quotation details are missing");
+      throw new Error("Required project information is missing");
     }
     const payload = buildEstimatePayload();
     try {
@@ -774,12 +779,13 @@ function QuotationBuilder({ initialQuote, onOpenSaved, onSaved }: { initialQuote
   const sectionSaved = savedSnapshot === JSON.stringify({ step, info, quotationDetails, floors, services });
   const sections = steps.map(title => ({ title }));
   const openSection = (index: number) => { setStep(index); setComplete(false); setActionErrors({}); };
+  const progressPercent = Math.round(((step + 1) / steps.length) * 100);
   return (
     <div className="qv2 qv2-workspace">
       <nav className="qv2-subnav" aria-label="Quotation sections">{sections.map((section, index) => { const Icon = stepIcons[index]; return <button type="button" key={section.title} aria-current={step === index ? 'page' : undefined} onClick={() => openSection(index)}><Icon size={19} /><span>{section.title}</span></button>; })}</nav>
       <div ref={pageTop} className="qv2-workspace-content">
       <SEO
-        title="Quotation Library V2"
+        title="Quotation Library"
         description="Create a quotation with work areas and service pricing."
       />
       <header className="qv2-page-header">
@@ -795,6 +801,40 @@ function QuotationBuilder({ initialQuote, onOpenSaved, onSaved }: { initialQuote
           </Button>
         </div>
       </header>
+      <section className="mb-5 rounded-2xl border border-sky-100 bg-white px-5 py-4 shadow-sm" aria-label="Quotation creation progress">
+        <div className="mb-3 flex flex-wrap items-center justify-between gap-2">
+          <div>
+            <p className="text-xs font-semibold uppercase tracking-wider text-sky-700">
+              Step {step + 1} of {steps.length}
+            </p>
+            <p className="mt-1 text-sm font-semibold text-sky-950">{steps[step]}</p>
+          </div>
+          <div className="text-right">
+            <span className="text-sm font-bold text-sky-800">{progressPercent}%</span>
+            {step < steps.length - 1 && (
+              <p className="mt-1 text-xs text-gray-500">Next: {steps[step + 1]}</p>
+            )}
+          </div>
+        </div>
+        <div
+          className="h-2.5 overflow-hidden rounded-full bg-sky-100"
+          role="progressbar"
+          aria-label={`Quotation creation: ${steps[step]}`}
+          aria-valuemin={0}
+          aria-valuemax={100}
+          aria-valuenow={progressPercent}
+          aria-valuetext={`Step ${step + 1} of ${steps.length}: ${steps[step]}`}
+        >
+          <div
+            className="h-full rounded-full bg-gradient-to-r from-sky-600 to-cyan-500 transition-[width] duration-500 ease-out"
+            style={{ width: `${progressPercent}%` }}
+          />
+        </div>
+        <div className="mt-2 flex justify-between text-[10px] font-medium text-gray-400" aria-hidden="true">
+          <span>Started</span>
+          <span>{step === steps.length - 1 ? "Ready to review" : `${steps.length - step - 1} step${steps.length - step - 1 === 1 ? "" : "s"} remaining`}</span>
+        </div>
+      </section>
       {saveMessage && <div role="status" className={`mb-5 rounded-xl border p-3 text-sm ${saveMessage.type === "success" ? "border-emerald-200 bg-emerald-50 text-emerald-800" : "border-red-200 bg-red-50 text-red-800"}`}>{saveMessage.text}</div>}
       {complete ? (
         <Section title="Quotation confirmed for this preview">
@@ -870,47 +910,6 @@ function QuotationBuilder({ initialQuote, onOpenSaved, onSaved }: { initialQuote
                       {textField("end", "Estimated End Date", "date")}
                     </div>
                   </Section>
-                  <Section
-                    title="Quotation details & terms"
-                    description="Write specifications, scope of work, warranty, and payment terms for this quotation."
-                    action={
-                      <Button size="sm" onClick={() => openSection(1)}>
-                        <FileEdit size={14} className="mr-2" />
-                        Open Details Editor
-                      </Button>
-                    }
-                  >
-                    <div className="space-y-4 rounded-xl border border-sky-100 bg-gradient-to-br from-sky-50/60 to-white p-5">
-                      <div className="flex flex-wrap items-center justify-between gap-3">
-                        <div>
-                          <h3 className="text-sm font-semibold text-sky-950 flex items-center gap-2">
-                            <Sparkles size={16} className="text-sky-600" />
-                            Quotation Details & Scope
-                          </h3>
-                          <p className="mt-1 text-xs text-sky-700">
-                            {quotationDetails.length > 0
-                              ? `${quotationDetails.length} detail block(s) configured. These details will be formatted into your final quotation and client PDF.`
-                              : "No quotation details configured yet. Add scope, milestones, and warranties."}
-                          </p>
-                        </div>
-                        <Button
-                          size="sm"
-                          variant="outline"
-                          onClick={() => openSection(1)}
-                        >
-                          <FileEdit size={14} className="mr-1.5" />
-                          Edit in Quotation Details
-                          <ArrowRight size={13} className="ml-1.5" />
-                        </Button>
-                      </div>
-
-                      {quotationDetails.length > 0 && (
-                        <div className="max-h-48 overflow-y-auto rounded-lg border border-sky-200/60 bg-white p-3.5 text-xs text-gray-700 shadow-2xs">
-                          <QuotationDetailsPreview blocks={quotationDetails} />
-                        </div>
-                      )}
-                    </div>
-                  </Section>
                 </>
               )}
               {step === 1 && (
@@ -923,7 +922,6 @@ function QuotationBuilder({ initialQuote, onOpenSaved, onSaved }: { initialQuote
                   </aside>
                   <Section
                     title="Quotation details & terms"
-                    description="Format your custom quotation clauses, scope of work, warranties, and terms using the rich text editor."
                   >
                     <QuotationDetailsEditor
                       value={quotationDetails}
