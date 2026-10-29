@@ -28,6 +28,7 @@ import {
 } from "lucide-react";
 import { useAppSelector } from "@/store/hooks";
 import { selectAuthUser } from "@/store/authSlice";
+import { useToast } from "@/context/ToastContext";
 import { Button } from "@/shared/components/ui/Button";
 import { Modal } from "@/shared/components/ui/Modal";
 import { SEO } from "@/shared/components/seo/SEO";
@@ -187,6 +188,8 @@ export function QuoteLibraryV2Page() {
 
 function QuotationWorkspace() {
   const navigate = useNavigate();
+  const { toast } = useToast();
+  const [downloadingId, setDownloadingId] = useState<string | null>(null);
   const [showSaved, setShowSaved] = useState(true);
   const [selectedQuote, setSelectedQuote] = useState<QuoteEstimate | null>(null);
   const { data, isLoading } = useGetQuoteEstimatesQuery({ limit: 100 });
@@ -194,6 +197,49 @@ function QuotationWorkspace() {
   const [deleteQuote, { isLoading: isDeleting }] = useDeleteQuoteEstimateMutation();
   const [rejectQuote, { isLoading: isRejecting }] = useRejectQuoteEstimateMutation();
   const [cancelQuote, { isLoading: isCancelling }] = useCancelQuoteEstimateMutation();
+
+  const handleDownloadDirect = async (quote: QuoteEstimate) => {
+    setDownloadingId(quote.id);
+    try {
+      const token = localStorage.getItem("auth_token");
+      const response = await fetch(
+        `${config.apiBaseUrl}/admin/quote-estimates/${quote.id}/pdf`,
+        {
+          method: "GET",
+          headers: {
+            Accept: "application/pdf",
+            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+          },
+        },
+      );
+      if (!response.ok) {
+        let errMsg = "Failed to export PDF";
+        try {
+          const errJson = await response.json();
+          errMsg = errJson.message || errMsg;
+        } catch (_) {
+          errMsg = response.statusText || errMsg;
+        }
+        throw new Error(errMsg);
+      }
+      const blob = await response.blob();
+      const url = window.URL.createObjectURL(blob);
+      const link = document.createElement("a");
+      link.href = url;
+      link.download = `${quote.quoteNumber || "quotation"}.pdf`;
+      document.body.appendChild(link);
+      link.click();
+      setTimeout(() => {
+        if (link.parentNode) link.parentNode.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      }, 3000);
+      toast.success("Download started", `${quote.quoteNumber}.pdf downloaded`);
+    } catch (err: any) {
+      toast.error("Download failed", err.message || "Could not download PDF");
+    } finally {
+      setDownloadingId(null);
+    }
+  };
 
   if (showSaved) {
     return (
@@ -232,6 +278,14 @@ function QuotationWorkspace() {
                   ) : (
                     <Button className="flex-1" variant="outline" onClick={() => { setSelectedQuote(quote); setShowSaved(false); }}>Open</Button>
                   )}
+                  <Button
+                    variant="outline"
+                    title="Download PDF"
+                    onClick={() => void handleDownloadDirect(quote)}
+                    disabled={downloadingId === quote.id}
+                  >
+                    {downloadingId === quote.id ? <Loader2 size={15} className="animate-spin" /> : <Download size={15} />}
+                  </Button>
                   {(["draft", "sent"] as string[]).includes(quote.status) && <Button variant="outline" disabled={isRejecting} title="Reject quotation" onClick={async () => { if (window.confirm(`Reject ${quote.quoteNumber}?`)) await rejectQuote({ id: quote.id }).unwrap(); }}><CircleOff size={15} /></Button>}
                   {(["draft", "sent", "accepted"] as string[]).includes(quote.status) && <Button variant="outline" disabled={isCancelling} title="Cancel quotation" onClick={async () => { if (window.confirm(`Cancel ${quote.quoteNumber}?`)) await cancelQuote(quote.id).unwrap(); }}><Archive size={15} /></Button>}
                   {quote.status !== "converted" && <Button variant="outline" disabled={isDeleting} title="Delete quotation" onClick={async () => { if (window.confirm(`Delete ${quote.quoteNumber}?`)) await deleteQuote(quote.id).unwrap(); }}><Trash2 size={15} /></Button>}
@@ -305,6 +359,7 @@ function QuotationBuilder({ initialQuote, onOpenSaved, onSaved }: { initialQuote
           : [],
       }))
     : [];
+  const { toast } = useToast();
   const { data: companies = [] } = useGetCompaniesQuery({ limit: 100 });
   const [createQuote, { isLoading: isCreatingQuote }] = useCreateQuoteEstimateMutation();
   const [updateQuote, { isLoading: isUpdatingQuote }] = useUpdateQuoteEstimateMutation();
@@ -405,8 +460,8 @@ function QuotationBuilder({ initialQuote, onOpenSaved, onSaved }: { initialQuote
 
   const buildQuotationPayload = () => ({
     project: info.project || "Quotation",
-    company: info.company || "",
-    client: info.client || "",
+    company: info.company || (info.companyId ? companies.find((c) => c.id === info.companyId)?.name : "") || (companies[0]?.name ?? "Service Provider"),
+    client: info.client || "Client",
     address: info.address || "",
     phone: info.phone || "",
     email: info.email || "",
@@ -545,18 +600,60 @@ function QuotationBuilder({ initialQuote, onOpenSaved, onSaved }: { initialQuote
     setIsDownloadingPdf(true);
     setPdfMessage(null);
     try {
-      const quote = await saveQuotation();
+      let quoteId = currentQuote?.id;
+
+      // Try auto-saving first if required fields exist and quote is not already converted
+      if (info.companyId && info.project.trim() && info.client.trim() && currentQuote?.status !== "converted") {
+        try {
+          const saved = await saveQuotation();
+          if (saved?.id) quoteId = saved.id;
+        } catch (saveErr) {
+          console.warn("Auto-save before download failed, proceeding with direct PDF export:", saveErr);
+        }
+      }
+
       const token = localStorage.getItem("auth_token");
-      const response = await fetch(
-        `${config.apiBaseUrl}/admin/quote-estimates/${quote.id}/pdf`,
-        {
-          method: "GET",
-          headers: {
-            Accept: "application/pdf",
-            ...(token ? { Authorization: `Bearer ${token}` } : {}),
+      let response: Response | null = null;
+
+      // Attempt 1: If quoteId exists, fetch saved quote PDF
+      if (quoteId) {
+        try {
+          const res = await fetch(
+            `${config.apiBaseUrl}/admin/quote-estimates/${quoteId}/pdf`,
+            {
+              method: "GET",
+              headers: {
+                Accept: "application/pdf",
+                ...(token ? { Authorization: `Bearer ${token}` } : {}),
+              },
+            },
+          );
+          if (res.ok) {
+            response = res;
+          } else {
+            console.warn(`GET quote PDF returned ${res.status}, falling back to V2 export`);
+          }
+        } catch (fetchErr) {
+          console.warn("GET quote PDF error, falling back to V2 export:", fetchErr);
+        }
+      }
+
+      // Attempt 2: If no quoteId or GET failed, use V2 export with builder state directly
+      if (!response) {
+        const payload = buildQuotationPayload();
+        response = await fetch(
+          `${config.apiBaseUrl}/admin/quote-estimates/v2/export-pdf`,
+          {
+            method: "POST",
+            headers: {
+              "Content-Type": "application/json",
+              Accept: "application/pdf",
+              ...(token ? { Authorization: `Bearer ${token}` } : {}),
+            },
+            body: JSON.stringify(payload),
           },
-        },
-      );
+        );
+      }
 
       if (!response.ok) {
         let errMsg = "Failed to export PDF";
@@ -577,19 +674,30 @@ function QuotationBuilder({ initialQuote, onOpenSaved, onSaved }: { initialQuote
         .trim()
         .toLowerCase()
         .replace(/[^a-z0-9_-]/g, "_");
-      link.download = `${quote.quoteNumber || `quotation-${cleanProject}`}.pdf`;
+      link.download = currentQuote?.quoteNumber
+        ? `${currentQuote.quoteNumber}.pdf`
+        : `quotation-${cleanProject}.pdf`;
       document.body.appendChild(link);
       link.click();
-      document.body.removeChild(link);
-      window.URL.revokeObjectURL(url);
-      setPdfMessage({ type: "success", text: "Quotation PDF downloaded successfully!" });
+      
+      // Delay revocation so Chrome/Edge on Windows does not cancel the download
+      setTimeout(() => {
+        if (link.parentNode) link.parentNode.removeChild(link);
+        window.URL.revokeObjectURL(url);
+      }, 3000);
+
+      const successMsg = "Quotation PDF downloaded successfully!";
+      setPdfMessage({ type: "success", text: successMsg });
+      toast.success("Download started", successMsg);
       setTimeout(() => setPdfMessage(null), 5000);
     } catch (err: any) {
       console.error("PDF download error:", err);
+      const errorMsg = err.message || "Failed to download PDF. Please try again.";
       setPdfMessage({
         type: "error",
-        text: err.message || "Failed to download PDF. Please try again.",
+        text: errorMsg,
       });
+      toast.error("Download failed", errorMsg);
     } finally {
       setIsDownloadingPdf(false);
     }
@@ -1468,6 +1576,16 @@ function QuotationBuilder({ initialQuote, onOpenSaved, onSaved }: { initialQuote
                   <h4 className="text-xs font-semibold text-gray-800 uppercase tracking-wider">Export & Client Delivery</h4>
                   <p className="text-xs text-gray-500 mt-1">Generate a branded PDF or deliver directly to {info.client ? `${info.client}'s email` : 'client email'}.</p>
                 </div>
+                {pdfMessage && (
+                  <div className={`p-2.5 rounded-lg text-xs font-medium flex items-center gap-2 ${
+                    pdfMessage.type === "success"
+                      ? "bg-emerald-50 text-emerald-800 border border-emerald-200"
+                      : "bg-rose-50 text-rose-800 border border-rose-200"
+                  }`}>
+                    {pdfMessage.type === "success" ? <CheckCircle2 size={15} className="shrink-0" /> : <Info size={15} className="shrink-0" />}
+                    <span>{pdfMessage.text}</span>
+                  </div>
+                )}
                 <div className="flex flex-col gap-2">
                   <Button
                     variant="outline"

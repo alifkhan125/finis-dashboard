@@ -161,8 +161,10 @@ export function ProjectQuotationView({
       a.download = `Quotation-${activeQuote.quoteNumber || project.name}.pdf`;
       document.body.appendChild(a);
       a.click();
-      window.URL.revokeObjectURL(url);
-      document.body.removeChild(a);
+      setTimeout(() => {
+        if (a.parentNode) a.parentNode.removeChild(a);
+        window.URL.revokeObjectURL(url);
+      }, 3000);
     } catch (err: any) {
       console.error('Failed to download quotation PDF:', err);
       alert('Unable to download quotation PDF: ' + (err?.message || 'Error'));

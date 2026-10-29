@@ -1,8 +1,8 @@
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useMemo, useRef, useState, type ReactNode } from 'react';
 import { useNavigate, useParams } from 'react-router-dom';
-import { BookOpen, Bold, ChevronLeft, ChevronDown, ChevronUp, Highlighter, Italic, Palette, Save, Settings, Trash2, Plus, Edit3, Eye } from 'lucide-react';
+import { AlignCenter, AlignLeft, AlignRight, Bold, ChevronLeft, ChevronDown, ChevronUp, Highlighter, Italic, Link2, List, ListOrdered, Palette, Redo2, RemoveFormatting, Save, Trash2, Plus, Edit3, Eye, Underline, Undo2 } from 'lucide-react';
 import { useGetPublicContentQuery, useGetPublicContentPageQuery, useUpsertPublicContentPageMutation, useUpdatePublicContentPageMutation, useDeletePublicContentPageMutation, type PublicContentSection, type PublicContentPage } from '@/store/publicContentApi';
-import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/shared/components/ui/Card';
+import { Card, CardContent } from '@/shared/components/ui/Card';
 import { Button } from '@/shared/components/ui/Button';
 import { Input } from '@/shared/components/ui/Input';
 import { cn } from '@/shared/utils';
@@ -26,11 +26,7 @@ function normalizeSections(sections: PublicContentPage['sections']) {
   return Array.isArray(sections) ? sections : [];
 }
 
-function getElementHtml(element: HTMLElement | null | undefined, fallback = '') {
-  return element?.innerHTML ?? fallback;
-}
-
-function FaqAnswerEditor({ content, onChange }: { content: string, onChange: (val: string) => void }) {
+function RichTextEditor({ content, onChange, placeholder = 'Write content here...' }: { content: string, onChange: (val: string) => void, placeholder?: string }) {
   const ref = useRef<HTMLDivElement>(null);
   
   useEffect(() => {
@@ -39,15 +35,82 @@ function FaqAnswerEditor({ content, onChange }: { content: string, onChange: (va
     }
   }, [content]);
 
-  return (
-    <div
-      ref={ref}
-      contentEditable
-      suppressContentEditableWarning
-      className="min-h-[120px] rounded-xl border border-gray-100 p-4 text-sm leading-7 text-gray-800 focus:outline-none"
-      onInput={(e) => onChange(e.currentTarget.innerHTML)}
-    />
+  const runCommand = (command: string, value?: string) => {
+    ref.current?.focus();
+    document.execCommand(command, false, value);
+    onChange(ref.current?.innerHTML ?? '');
+  };
+
+  const addLink = () => {
+    const url = window.prompt('Enter the link URL');
+    if (!url) return;
+    runCommand('createLink', /^https?:\/\//i.test(url) ? url : `https://${url}`);
+  };
+
+  const toolbarButton = (label: string, icon: ReactNode, command: string, value?: string) => (
+    <button
+      type="button"
+      title={label}
+      aria-label={label}
+      onMouseDown={(event) => event.preventDefault()}
+      onClick={() => runCommand(command, value)}
+      className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-600 transition hover:bg-white hover:text-[#1D4F6D] hover:shadow-sm"
+    >
+      {icon}
+    </button>
   );
+
+  return (
+    <div className="overflow-hidden rounded-2xl border border-gray-200 bg-white shadow-sm focus-within:border-[#1D4F6D]/40 focus-within:ring-4 focus-within:ring-[#1D4F6D]/5">
+      <div className="flex flex-wrap items-center gap-1 border-b border-gray-200 bg-gray-50 px-2 py-2">
+        <select
+          title="Text style"
+          aria-label="Text style"
+          defaultValue="p"
+          onChange={(event) => runCommand('formatBlock', event.target.value)}
+          className="mr-1 h-8 rounded-lg border border-gray-200 bg-white px-2 text-xs font-semibold text-gray-700 outline-none"
+        >
+          <option value="p">Paragraph</option>
+          <option value="h2">Heading 2</option>
+          <option value="h3">Heading 3</option>
+          <option value="blockquote">Quote</option>
+        </select>
+        {toolbarButton('Undo', <Undo2 className="h-4 w-4" />, 'undo')}
+        {toolbarButton('Redo', <Redo2 className="h-4 w-4" />, 'redo')}
+        <span className="mx-1 h-5 w-px bg-gray-200" />
+        {toolbarButton('Bold', <Bold className="h-4 w-4" />, 'bold')}
+        {toolbarButton('Italic', <Italic className="h-4 w-4" />, 'italic')}
+        {toolbarButton('Underline', <Underline className="h-4 w-4" />, 'underline')}
+        {toolbarButton('Highlight', <Highlighter className="h-4 w-4" />, 'hiliteColor', '#FEF3C7')}
+        <span className="mx-1 h-5 w-px bg-gray-200" />
+        {toolbarButton('Bulleted list', <List className="h-4 w-4" />, 'insertUnorderedList')}
+        {toolbarButton('Numbered list', <ListOrdered className="h-4 w-4" />, 'insertOrderedList')}
+        {toolbarButton('Align left', <AlignLeft className="h-4 w-4" />, 'justifyLeft')}
+        {toolbarButton('Align center', <AlignCenter className="h-4 w-4" />, 'justifyCenter')}
+        {toolbarButton('Align right', <AlignRight className="h-4 w-4" />, 'justifyRight')}
+        <button type="button" title="Add link" aria-label="Add link" onMouseDown={(event) => event.preventDefault()} onClick={addLink} className="flex h-8 w-8 items-center justify-center rounded-lg text-gray-600 transition hover:bg-white hover:text-[#1D4F6D] hover:shadow-sm"><Link2 className="h-4 w-4" /></button>
+        {toolbarButton('Clear formatting', <RemoveFormatting className="h-4 w-4" />, 'removeFormat')}
+      </div>
+      <div
+        ref={ref}
+        contentEditable
+        suppressContentEditableWarning
+        data-placeholder={placeholder}
+        className="prose min-h-[150px] max-w-none p-4 text-sm leading-7 text-gray-800 outline-none empty:before:pointer-events-none empty:before:text-gray-400 empty:before:content-[attr(data-placeholder)] prose-headings:mb-2 prose-headings:mt-3 prose-li:my-1 prose-ol:pl-6 prose-ul:pl-6"
+        onInput={(e) => onChange(e.currentTarget.innerHTML)}
+      />
+      <div className="flex items-center justify-between border-t border-gray-100 px-4 py-2 text-[10px] font-medium text-gray-400">
+        <span>Rich text editor</span><span>{htmlToPlainText(content).length} characters</span>
+      </div>
+    </div>
+  );
+}
+
+function htmlToPlainText(value: string) {
+  if (!value) return '';
+  const element = document.createElement('div');
+  element.innerHTML = value;
+  return element.textContent?.trim() ?? '';
 }
 
 export function PublicContentEditorPage() {
@@ -61,12 +124,13 @@ export function PublicContentEditorPage() {
   const { data: pages = [], refetch } = useGetPublicContentQuery();
   const { data: pageBySlug } = useGetPublicContentPageQuery(slug);
   const [upsertPage, { isLoading: isCreatingPage }] = useUpsertPublicContentPageMutation();
-  const [updatePage, { isLoading: isUpdatingPage }] = useUpdatePublicContentPageMutation();
+  const [, { isLoading: isUpdatingPage }] = useUpdatePublicContentPageMutation();
   const [deletePage, { isLoading: isDeletingPage }] = useDeletePublicContentPageMutation();
   const isSubmitting = isCreatingPage || isUpdatingPage;
 
   const activePage = useMemo(() => pageBySlug ?? pages.find((page) => page.slug === slug) ?? null, [pageBySlug, pages, slug]);
   const meta = pageMeta[slug] ?? pageMeta['about-us'];
+  const isLegalPage = slug === 'privacy-policy' || slug === 'terms-and-conditions';
 
   const [pageForm, setPageForm] = useState({ slug, title: meta.label, subtitle: '', isPublished: true });
   const [sections, setSections] = useState<PublicContentSection[]>([{ title: 'Section Title', content: 'Section content' }]);
@@ -116,7 +180,7 @@ export function PublicContentEditorPage() {
       title: pageForm.title,
       subtitle: pageForm.subtitle || null,
       body: html,
-      sections,
+      sections: isLegalPage ? [] : sections,
       isPublished: pageForm.isPublished,
     };
     await upsertPage(payload).unwrap();
@@ -132,6 +196,8 @@ export function PublicContentEditorPage() {
   useLayoutEffect(() => {
     if (!isEditing || !editorRef.current) return;
     editorRef.current.innerHTML = pageHtml;
+    // Only initialize the contentEditable surface when edit mode opens.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isEditing]);
 
   const handleEditToggle = () => {
@@ -190,7 +256,7 @@ export function PublicContentEditorPage() {
       </Card>
 
       <div className="rounded-[28px] border border-gray-100 bg-[linear-gradient(180deg,#f8fafc_0%,#ffffff_42%)] p-4 shadow-[0_25px_60px_-40px_rgba(15,23,42,0.35)]">
-        {isEditing && slug !== 'faq' && (
+        {isEditing && slug !== 'faq' && !isLegalPage && (
           <Card className="mb-4 border border-gray-100 bg-white shadow-sm">
             <CardContent className="flex flex-wrap gap-2 p-3">
               <select className="rounded-md border border-gray-200 px-3 py-2 text-sm">
@@ -273,7 +339,7 @@ export function PublicContentEditorPage() {
                               onChange={(e) => setSections((current) => current.map((item, i) => i === index ? { ...item, title: e.target.value } : item))}
                               placeholder="Question"
                             />
-                            <FaqAnswerEditor
+                            <RichTextEditor
                               content={section.content || ''}
                               onChange={(val) => setSections((current) => current.map((item, i) => i === index ? { ...item, content: val } : item))}
                             />
@@ -306,6 +372,29 @@ export function PublicContentEditorPage() {
                     </div>
                   </div>
                 ))}
+              </div>
+            )
+          ) : isLegalPage ? (
+            isEditing ? (
+              <div className="mt-8 space-y-5">
+                <div className="mx-auto max-w-[850px] rounded-sm border border-gray-200 bg-white px-10 py-12 shadow-[0_4px_24px_rgba(15,23,42,0.10)] md:min-h-[980px] md:px-20 md:py-16">
+                  <div className="mb-8 space-y-3 border-b border-gray-100 pb-6">
+                    <Input value={pageForm.title} onChange={(e) => setPageForm((p) => ({ ...p, title: e.target.value }))} placeholder="Document title" className="border-0 px-0 text-3xl font-bold shadow-none focus:ring-0" />
+                    <Input value={pageForm.subtitle} onChange={(e) => setPageForm((p) => ({ ...p, subtitle: e.target.value }))} placeholder="Document summary (optional)" className="border-0 px-0 text-sm text-gray-500 shadow-none focus:ring-0" />
+                  </div>
+                  <RichTextEditor content={pageHtml} onChange={setPageHtml} placeholder="Start writing your document. Use the toolbar to add headings, numbered points, bullet lists, links, and formatting..." />
+                </div>
+                <div className="sticky bottom-4 flex items-center justify-between gap-3 rounded-2xl border border-gray-200 bg-white/95 p-4 shadow-xl backdrop-blur">
+                  <label className="flex items-center gap-2 text-xs font-semibold text-gray-600"><input type="checkbox" checked={pageForm.isPublished} onChange={(e) => setPageForm((current) => ({ ...current, isPublished: e.target.checked }))} className="h-4 w-4 accent-[#1D4F6D]" />Published in app</label>
+                  <div className="flex gap-2">
+                    <Button variant="outline" type="button" onClick={handleEditToggle}>Cancel</Button>
+                    <Button type="button" onClick={handleSave} disabled={isSubmitting} className="gap-2"><Save className="h-4 w-4" />{isSubmitting ? 'Saving...' : 'Save document'}</Button>
+                  </div>
+                </div>
+              </div>
+            ) : (
+              <div className="mx-auto mt-8 min-h-[900px] max-w-[850px] rounded-sm border border-gray-200 bg-white px-10 py-12 shadow-[0_4px_24px_rgba(15,23,42,0.10)] md:px-20 md:py-16">
+                <div className="prose max-w-none text-left prose-headings:text-gray-900 prose-li:my-1 prose-ol:pl-6 prose-p:leading-8 prose-p:text-gray-700 prose-ul:pl-6" dangerouslySetInnerHTML={{ __html: pageHtml || '<p>No document content available.</p>' }} />
               </div>
             )
           ) : (

@@ -55,6 +55,7 @@ export const ROUTES = {
     // Tenant & User Management
     USERS: '/users',
     TENANTS: '/tenants',
+    TENANT_DETAIL: '/tenants/:id',
     SUBSCRIPTION_PLANS: '/subscription-plans',
     PUBLIC_PLANS: '/plans',
 
@@ -80,6 +81,7 @@ export const buildRoute = {
     companyDetail: (id: string) => `/companies/${id}`,
     workerDetail: (id: string) => `/workforce/${id}`,
     managerDetail: (id: string) => `/managers/${id}`,
+    tenantDetail: (id: string) => `/tenants/${id}`,
     taskDetail: (projectId: string, taskId: string) => `/projects/${projectId}/tasks/${taskId}`,
     subtaskDetail: (projectId: string, taskId: string) => `/projects/${projectId}/subtasks/${taskId}`,
 };

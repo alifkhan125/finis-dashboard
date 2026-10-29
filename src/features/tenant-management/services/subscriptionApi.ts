@@ -67,6 +67,42 @@ export type TenantApi = {
   createdAt?: string;
 };
 
+export type TenantDetailApi = TenantApi & {
+  usage?: {
+    companies: { used: number; max: number | string | null };
+    projects: { used: number; max: number | string | null };
+    users: { used: number; max: number | string | null };
+  };
+  companies?: Array<{ id: string; name: string; logoUrl?: string | null; isActive: boolean; _count?: { projects: number } }>;
+  users?: Array<{ id: string; fullName: string; email: string; phone?: string | null; avatarUrl?: string | null; status: string; createdAt: string }>;
+};
+
+type TenantWireApi = TenantDetailApi & {
+  subscriptionStatus?: TenantApi['subscription'] extends infer S ? S extends { status: infer V } ? V : never : never;
+  currentPeriodStart?: string | null;
+  currentPeriodEnd?: string | null;
+  planInterval?: 'monthly' | 'yearly' | null;
+  stripeSubscriptionId?: string | null;
+  billedAmount?: number | null;
+  subscription?: TenantDetailApi['subscription'] & { subscriptionStatus?: TenantDetailApi['subscription'] extends infer S ? S extends { status: infer V } ? V : never : never };
+};
+
+function normalizeTenant(tenant: TenantWireApi): TenantDetailApi {
+  const wireSubscription = tenant.subscription;
+  return {
+    ...tenant,
+    subscription: {
+      ...wireSubscription,
+      status: wireSubscription?.status ?? wireSubscription?.subscriptionStatus ?? tenant.subscriptionStatus ?? null,
+      currentPeriodStart: wireSubscription?.currentPeriodStart ?? tenant.currentPeriodStart ?? null,
+      currentPeriodEnd: wireSubscription?.currentPeriodEnd ?? tenant.currentPeriodEnd ?? null,
+      planInterval: wireSubscription?.planInterval ?? tenant.planInterval ?? null,
+      stripeSubscriptionId: wireSubscription?.stripeSubscriptionId ?? tenant.stripeSubscriptionId ?? null,
+      billedAmount: wireSubscription?.billedAmount ?? tenant.billedAmount ?? null,
+    },
+  };
+}
+
 export type SubscriptionPurchaseApi = {
   tenant: {
     id: string;
@@ -130,40 +166,17 @@ export async function getTenants(token?: string, params?: { page?: number; limit
   if (params?.page) query.set('page', String(params.page));
   if (params?.limit) query.set('limit', String(params.limit));
   if (params?.search) query.set('search', params.search);
-  return request<{ data: TenantApi[]; meta: { total: number; page: number; limit: number; totalPages: number } }>(
+  const response = await request<{ data: TenantWireApi[]; meta: { total: number; page: number; limit: number; totalPages: number } }>(
     `/tenants${query.toString() ? `?${query}` : ''}`,
     {},
     token,
   );
+  return { ...response, data: response.data.map(normalizeTenant) };
 }
 
 export async function getTenantById(id: string, token?: string) {
-  return request<{
-    data: TenantApi & {
-      subscription?: TenantApi['subscription'];
-      usage?: {
-        companies: { used: number; max: number | string | null };
-        projects: { used: number; max: number | string | null };
-        users: { used: number; max: number | string | null };
-      };
-      companies?: Array<{
-        id: string;
-        name: string;
-        logoUrl?: string | null;
-        isActive: boolean;
-        _count?: { projects: number };
-      }>;
-      users?: Array<{
-        id: string;
-        fullName: string;
-        email: string;
-        phone?: string | null;
-        avatarUrl?: string | null;
-        status: string;
-        createdAt: string;
-      }>;
-    };
-  }>(`/tenants/${id}`, {}, token);
+  const response = await request<{ data: TenantWireApi }>(`/tenants/${id}`, {}, token);
+  return { ...response, data: normalizeTenant(response.data) };
 }
 
 export async function getSubscriptionPurchases(token?: string, params?: { page?: number; limit?: number; search?: string }) {

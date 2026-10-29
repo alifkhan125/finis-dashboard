@@ -30,6 +30,7 @@ const ManagersPage = lazy(() => import('@/features/admin-management/pages/Manage
 const ManagerDetailPage = lazy(() => import('@/features/admin-management/pages/ManagerDetailPage').then((m) => ({ default: m.ManagerDetailPage })));
 const UsersPage = lazy(() => import('@/features/tenant-management/pages/UsersPage').then((m) => ({ default: m.UsersPage })));
 const TenantsPage = lazy(() => import('@/features/tenant-management/pages/TenantsPage').then((m) => ({ default: m.TenantsPage })));
+const TenantDetailPage = lazy(() => import('@/features/tenant-management/pages/TenantDetailPage').then((m) => ({ default: m.TenantDetailPage })));
 const SubscriptionPlansPage = lazy(() => import('@/features/tenant-management/pages/SubscriptionPlansPage').then((m) => ({ default: m.SubscriptionPlansPage })));
 const PublicSubscriptionPlansPage = lazy(() => import('@/features/tenant-management/pages/PublicSubscriptionPlansPage').then((m) => ({ default: m.PublicSubscriptionPlansPage })));
 const SubscriptionSuccessPage = lazy(() => import('@/features/tenant-management/pages/SubscriptionSuccessPage').then((m) => ({ default: m.SubscriptionSuccessPage })));
@@ -110,6 +111,7 @@ export function AppRouter() {
                     <Route path={ROUTES.INVENTORY} element={<InventoryPage />} />
                     <Route path={ROUTES.USERS} element={<UsersPage />} />
                     <Route path={ROUTES.TENANTS} element={<TenantsPage />} />
+                    <Route path={ROUTES.TENANT_DETAIL} element={<TenantDetailPage />} />
                     <Route path={ROUTES.SUBSCRIPTION_PLANS} element={<SubscriptionPlansPage />} />
                     <Route path={ROUTES.SETTINGS} element={<SettingsPage />} />
                             <Route path="/payroll" element={<PayrollPage />} />

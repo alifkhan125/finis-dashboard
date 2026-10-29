@@ -13,6 +13,7 @@ import {
 } from 'lucide-react';
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from 'recharts';
 import { Link } from 'react-router-dom';
+import { buildRoute } from '@/config/routes';
 import { Card } from '@/shared/components/ui/Card';
 import { Button } from '@/shared/components/ui/Button';
 import { Input } from '@/shared/components/ui/Input';
@@ -558,7 +559,7 @@ export function TenantsPage() {
               header: 'Actions',
               render: (tenant) => (
                 <div className="flex items-center gap-2">
-                  <Link to={`/companies/${tenant.id}`}>
+                  <Link to={buildRoute.tenantDetail(tenant.id)}>
                     <Button size="sm" variant="outline">
                       <ShieldCheck className="w-4 h-4 mr-2" />
                       View
