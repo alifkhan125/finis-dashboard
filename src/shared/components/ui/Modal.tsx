@@ -1,4 +1,5 @@
 import React, { useEffect, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
 import { cn } from '@/shared/utils';
 import { Button } from './Button';
@@ -96,10 +97,10 @@ export function Modal({
     '6xl': 'max-w-6xl'
   };
 
-  return (
+  const modalNode = (
     <div
       style={zIndex ? { zIndex } : undefined}
-      className="fixed inset-0 z-[100] flex items-start sm:items-center justify-center bg-[#020617]/70 backdrop-blur-sm p-4 overflow-y-auto animate-in fade-in duration-300"
+      className="fixed inset-0 z-[9999] flex items-start sm:items-center justify-center bg-[#020617]/70 backdrop-blur-sm p-4 overflow-y-auto animate-in fade-in duration-300"
       onClick={(e) => {
         if (e.target === e.currentTarget) onClose();
       }}
@@ -136,4 +137,8 @@ export function Modal({
       </div>
     </div>
   );
+
+  return typeof document !== 'undefined'
+    ? createPortal(modalNode, document.body)
+    : modalNode;
 }
