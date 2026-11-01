@@ -33,7 +33,7 @@ export function startWorkforceSocket(store: Store, projectId: string) {
       const pathname = url.pathname.replace(/\/+$/, '');
       return `${url.origin}${pathname}`;
     } catch {
-      return (config.apiBaseUrl || 'http://localhost:3000').replace(/\/+$/, '');
+      return (config.apiBaseUrl || '').replace(/\/+$/, '');
     }
   })();
   const token = typeof window !== 'undefined' ? localStorage.getItem('auth_token') || '' : '';

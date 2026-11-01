@@ -22,7 +22,7 @@ This dashboard connects to the NestJS API in the sibling `finis-backend`
 folder. The default local addresses are:
 
 - Dashboard: `http://localhost:5173`
-- Backend REST and Socket.IO: `http://localhost:6000`
+- Backend REST and Socket.IO: .env
 
 ### Requirements
 

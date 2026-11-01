@@ -43,7 +43,7 @@ function getBoolEnvVar(key: string, defaultValue = false): boolean {
 }
 
 export const config: EnvironmentConfig = {
-    apiBaseUrl: getEnvVar('VITE_API_BASE_URL', 'http://localhost:6000').replace(/\/+$/, ''),
+    apiBaseUrl: getEnvVar('VITE_API_BASE_URL', '').replace(/\/+$/, ''),
     useMockApi: getBoolEnvVar('VITE_USE_MOCK_API', false),
     environment: (getEnvVar('VITE_ENV', 'development') as EnvironmentConfig['environment']),
 

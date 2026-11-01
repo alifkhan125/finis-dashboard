@@ -11,7 +11,7 @@ import { getFullUrl } from '@/shared/utils/helpers';
 import { format } from 'date-fns';
 import { useUploadMessageFileMutation } from '@/store/messageApi';
 
-const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? 'http://localhost:6000';
+const API_BASE_URL = import.meta.env.VITE_API_BASE_URL ?? '';
 
 interface ChatWindowProps {
     conversation: ChatConversation;

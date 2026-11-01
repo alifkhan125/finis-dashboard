@@ -57,7 +57,7 @@ export function startGeofencingSocket(store: Store) {
       const pathname = url.pathname.replace(/\/+$/, '');
       return `${url.origin}${pathname}`;
     } catch {
-      return (config.apiBaseUrl || 'http://localhost:3000').replace(/\/+$/, '');
+      return (config.apiBaseUrl || '').replace(/\/+$/, '');
     }
   })();
   activeToken = token;

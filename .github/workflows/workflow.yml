@@ -24,8 +24,8 @@ jobs:
             - name: Build Project
               run: pnpm run build
 
-            - name: Deploy to AWS VPS
-              uses: appleboy/scp-action@v0.1.7
+            - name: Deploy & Build on AWS VPS
+              uses: appleboy/ssh-action@v1.0.3
               with: 
                 host: ${{secrets.VPS_HOST}}
                 username: ${{secrets.VPS_USER}}
@@ -33,5 +33,9 @@ jobs:
                 source: "dist/*"
                 target: "/var/www/finis-dashboard"
                 stript: |
+                    cd /var/www/finis-dashboard
+                    git pull origin build
+                    pnpm install
+                    pnpm run build
                     pm2 restart all
                     sudo systemctl reload nginx
