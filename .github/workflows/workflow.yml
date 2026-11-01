@@ -31,6 +31,11 @@ jobs:
                 username: ${{secrets.VPS_USER}}
                 key: ${{secrets.VPS_SSH_KEY}}
                 script: |
+                    export NVM_DIR="$HOME/.nvm"
+                    [ -s "$NVM_DIR/nvm.sh" ] && \. "$NVM_DIR/nvm.sh"
+                    [ -s "$HOME/.profile" ] && \. "$HOME/.profile"
+                    export PNPM_HOME="$HOME/.local/share/pnpm"
+                    export PATH="$PNPM_HOME:$PATH:$HOME/.nvm/versions/node/$(ls $HOME/.nvm/versions/node 2>/dev/null | tail -n 1)/bin:$HOME/.npm-global/bin:/usr/local/bin:/usr/bin"
                     cd /var/www/finis-dashboard
                     git pull origin build
                     rm -rf dist node_modules/.vite
