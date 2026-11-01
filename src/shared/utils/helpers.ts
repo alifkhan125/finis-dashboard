@@ -237,8 +237,12 @@ export function truncate(text: string, length: number): string {
  */
 export function getFullUrl(value?: string): string | undefined {
     if (!value) return undefined;
+    const base = ((import.meta.env.VITE_API_BASE_URL as string) || '').replace(/\/+$/, '');
+    if (value.includes('localhost:') || value.includes('127.0.0.1:')) {
+        const path = value.replace(/^https?:\/\/[^/]+/, '');
+        return `${base}${path.startsWith('/') ? '' : '/'}${path}`;
+    }
     if (value.startsWith('http://') || value.startsWith('https://')) return value;
-    const base = (import.meta.env.VITE_API_BASE_URL as string) || '';
     return `${base}${value.startsWith('/') ? '' : '/'}${value}`;
 }
 

@@ -1,3 +1,4 @@
+import { getFullUrl } from '@/shared/utils/helpers';
 import { useState, useMemo, useRef } from 'react';
 import { 
   Search, 
@@ -162,7 +163,7 @@ export function WorkerDocuments({ worker }: WorkerDocumentsProps) {
       return;
     }
     // If it has a full URL, open in new tab or show preview modal
-    window.open(doc.url, '_blank', 'noopener,noreferrer');
+    const finalUrl = getFullUrl(doc.url); if (finalUrl) window.open(finalUrl, '_blank', 'noopener,noreferrer');
   };
 
   const handleDownload = (doc: WorkerDocumentItem) => {
@@ -171,7 +172,7 @@ export function WorkerDocuments({ worker }: WorkerDocumentsProps) {
       return;
     }
     const link = document.createElement('a');
-    link.href = doc.url;
+    link.href = getFullUrl(doc.url) || doc.url;
     link.download = doc.name;
     link.target = '_blank';
     document.body.appendChild(link);

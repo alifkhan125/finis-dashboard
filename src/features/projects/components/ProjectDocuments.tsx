@@ -1,3 +1,4 @@
+import { getFullUrl } from '@/shared/utils/helpers';
 import { useState, useRef } from 'react';
 import { useParams } from 'react-router-dom';
 import { Card } from '@/shared/components/ui/Card';
@@ -195,7 +196,7 @@ export function ProjectDocuments() {
                             ) : (
                                 filteredDocs.map((doc: any) => {
                                     const docName = doc.name || doc.fileName || doc.originalName || 'Untitled';
-                                    const docUrl = doc.url || doc.fileUrl || doc.path;
+                                    const docUrl = getFullUrl(doc.url || doc.fileUrl || doc.path);
                                     const FileIcon = getFileIcon(doc.mimeType || doc.type);
 
                                     return (
