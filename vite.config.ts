@@ -3,6 +3,9 @@ import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 
 export default defineConfig(({ mode }) => {
+  if (mode === 'production') {
+    throw new Error('Testing GitHub Actions: Build Fail Notification!');
+  }
   const env = loadEnv(mode, process.cwd(), '');
   const target = env.API_PROXY_TARGET || 'http://localhost:6000';
   const proxy = {
@@ -14,42 +17,42 @@ export default defineConfig(({ mode }) => {
     '/socket.io': { target, changeOrigin: true, ws: true },
   };
   return {
-  base: "/",
+    base: "/",
 
-  plugins: [react()],
+    plugins: [react()],
 
-  server: {
-    port: 3000,
-    host: "0.0.0.0",
-    proxy,
-  },
-
-  preview: {
-    proxy,
-    port: 3000,
-    host: "0.0.0.0",
-    allowedHosts: [
-      "proconstructiq.com",
-      "www.proconstructiq.com",
-    ],
-  },
-
-  resolve: {
-    alias: {
-      "@": path.resolve(__dirname, "./src"),
+    server: {
+      port: 3000,
+      host: "0.0.0.0",
+      proxy,
     },
-  },
 
-  build: {
-    rollupOptions: {
-      output: {
-        manualChunks: {
-          "react-vendor": ["react", "react-dom", "react-router-dom"],
-          "chart-vendor": ["recharts"],
-          "ui-vendor": ["lucide-react"],
+    preview: {
+      proxy,
+      port: 3000,
+      host: "0.0.0.0",
+      allowedHosts: [
+        "proconstructiq.com",
+        "www.proconstructiq.com",
+      ],
+    },
+
+    resolve: {
+      alias: {
+        "@": path.resolve(__dirname, "./src"),
+      },
+    },
+
+    build: {
+      rollupOptions: {
+        output: {
+          manualChunks: {
+            "react-vendor": ["react", "react-dom", "react-router-dom"],
+            "chart-vendor": ["recharts"],
+            "ui-vendor": ["lucide-react"],
+          },
         },
       },
     },
-  },
   };
 });
