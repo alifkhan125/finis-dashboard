@@ -33,7 +33,8 @@ jobs:
                 script: |
                     cd /var/www/finis-dashboard
                     git pull origin build
+                    rm -rf dist node_modules/.vite
                     pnpm install
                     pnpm run build
-                    pm2 restart all
                     sudo systemctl reload nginx
+                    pm2 restart all

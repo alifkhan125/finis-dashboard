@@ -51,7 +51,7 @@ export function ProjectDetailPage() {
       const res = await apiClient.post(`/admin/projects/${project.id}/share`);
       const shareToken = (res.data as any)?.data?.shareToken || (res.data as any)?.shareToken || (res as any).shareToken;
       if (shareToken) {
-        const dashboardUrl = import.meta.env.VITE_APP_URL || window.location.origin;
+        const dashboardUrl = (typeof window !== 'undefined' && window.location.origin) ? window.location.origin : (import.meta.env.VITE_APP_URL || '');
         const link = `${dashboardUrl}/public/project/${shareToken}`;
         await navigator.clipboard.writeText(link);
         alert('Public link generated and copied to clipboard: ' + link);

@@ -41,7 +41,7 @@ cp .env.example .env
 Use this local `.env` configuration:
 
 ```dotenv
-VITE_API_BASE_URL=http://localhost:6000
+VITE_API_BASE_URL=.env
 VITE_APP_URL=http://localhost:5173
 VITE_ENV=development
 VITE_USE_MOCK_API=false
@@ -80,7 +80,7 @@ pnpm exec vite preview --host 0.0.0.0
 ### Verify the connection
 
 Open the browser developer tools and perform a login. API requests should go
-to `http://localhost:6000`, not port `5173`. A network error usually means the
+to .env, not port `5173`. A network error usually means the
 backend is stopped or `VITE_API_BASE_URL` is wrong. An HTTP `401`/`403` means
 the backend was reached but authentication or permissions rejected the
 request.

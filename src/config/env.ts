@@ -27,42 +27,27 @@ interface EnvironmentConfig {
     };
 }
 
-function getEnvVar(key: string, defaultValue?: string): string {
-    const value = (import.meta.env as Record<string, string | undefined>)[key];
-    if (value === undefined && defaultValue === undefined) {
-        console.warn(`Environment variable ${key} is not defined`);
-        return '';
-    }
-    return value || defaultValue || '';
-}
-
-function getBoolEnvVar(key: string, defaultValue = false): boolean {
-    const value = (import.meta.env as Record<string, string | undefined>)[key];
-    if (value === undefined) return defaultValue;
-    return value === 'true' || value === '1';
-}
-
 export const config: EnvironmentConfig = {
-    apiBaseUrl: getEnvVar('VITE_API_BASE_URL', '').replace(/\/+$/, ''),
-    useMockApi: getBoolEnvVar('VITE_USE_MOCK_API', false),
-    environment: (getEnvVar('VITE_ENV', 'development') as EnvironmentConfig['environment']),
+    apiBaseUrl: ((import.meta.env.VITE_API_BASE_URL as string) || '').replace(/\/+$/, ''),
+    useMockApi: import.meta.env.VITE_USE_MOCK_API === 'true' || import.meta.env.VITE_USE_MOCK_API === '1',
+    environment: ((import.meta.env.VITE_ENV as string) || 'development') as EnvironmentConfig['environment'],
 
     features: {
-        enableGeofencing: getBoolEnvVar('VITE_FEATURE_GEOFENCING', true),
-        enableChat: getBoolEnvVar('VITE_FEATURE_CHAT', true),
-        enableReports: getBoolEnvVar('VITE_FEATURE_REPORTS', true),
-        enablePayroll: getBoolEnvVar('VITE_FEATURE_PAYROLL', true),
+        enableGeofencing: import.meta.env.VITE_FEATURE_GEOFENCING !== 'false',
+        enableChat: import.meta.env.VITE_FEATURE_CHAT !== 'false',
+        enableReports: import.meta.env.VITE_FEATURE_REPORTS !== 'false',
+        enablePayroll: import.meta.env.VITE_FEATURE_PAYROLL !== 'false',
     },
     maps: {
-        googleMapsApiKey: getEnvVar('VITE_GOOGLE_MAPS_API_KEY', ''),
+        googleMapsApiKey: (import.meta.env.VITE_GOOGLE_MAPS_API_KEY as string) || '',
     },
     stripe: {
-        publishableKey: getEnvVar('VITE_STRIPE_PUBLISHABLE_KEY', 'pk_test_51TUBgUC2pLUXHqxfzDZPxt9L8CDYLTfixYOJnDsNfcPDOalKo4vGfLGEvdN7ShuqaCwrt1atXEZPduPVZXJ4UZZt00IOTFH2VZ'),
+        publishableKey: (import.meta.env.VITE_STRIPE_PUBLISHABLE_KEY as string) || 'pk_test_51TUBgUC2pLUXHqxfzDZPxt9L8CDYLTfixYOJnDsNfcPDOalKo4vGfLGEvdN7ShuqaCwrt1atXEZPduPVZXJ4UZZt00IOTFH2VZ',
     },
 
     app: {
         name: 'FinisPro Admin Dashboard',
-        version: getEnvVar('VITE_APP_VERSION', '1.0.0'),
+        version: (import.meta.env.VITE_APP_VERSION as string) || '1.0.0',
     },
 };
 

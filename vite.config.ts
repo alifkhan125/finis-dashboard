@@ -41,6 +41,7 @@ export default defineConfig(({ mode }) => {
     },
 
     build: {
+      emptyOutDir: true,
       rollupOptions: {
         output: {
           manualChunks: {
