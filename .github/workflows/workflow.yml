@@ -32,4 +32,6 @@ jobs:
                 key: ${{secrets.VPS_SSH_KEY}}
                 source: "dist/*"
                 target: "/var/www/finis-dashboard"
-                strip_components: 1
+                stript: |
+                    pm2 restart all
+                    sudo systemctl reload nginx
