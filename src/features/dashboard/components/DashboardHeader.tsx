@@ -11,7 +11,7 @@ export function DashboardHeader({ onFilterChange, onCustomDateChange }: Dashboar
     return (
         <PageHeader
             title="Dashboard"
-            description="Insights & Analytics Hub   Hello"
+            description="Insights & Analytics Hub"
             icon={LayoutGrid}
             className="mb-6 relative text-black"
         >
