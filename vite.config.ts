@@ -3,9 +3,6 @@ import { defineConfig, loadEnv } from "vite";
 import react from "@vitejs/plugin-react";
 
 export default defineConfig(({ mode }) => {
-  if (mode === 'production') {
-    throw new Error('Testing GitHub Actions: Build Fail Notification!');
-  }
   const env = loadEnv(mode, process.cwd(), '');
   const target = env.API_PROXY_TARGET || 'http://localhost:6000';
   const proxy = {
