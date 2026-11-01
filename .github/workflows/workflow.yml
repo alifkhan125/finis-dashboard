@@ -3,7 +3,7 @@ name: Frontend Deploy Pipeline
 on:
     push:
         branches: 
-            - main
+            - build
 
 jobs:
     build-and-deploy:
