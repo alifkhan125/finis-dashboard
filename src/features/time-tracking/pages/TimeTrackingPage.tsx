@@ -141,7 +141,7 @@ export function TimeTrackingPage() {
                         <Card className="p-6">
                             <h3 className="text-lg font-semibold mb-4">Recent Check-Ins</h3>
                             <div className="space-y-3">
-                                {attendanceList.slice(0, 3).map((entry, index) => (
+                                {attendanceList.filter(entry => entry.session?.checkInTime).slice(0, 3).map((entry, index) => (
                                     <div key={index} className="flex items-center justify-between py-2 border-b">
                                         <div>
                                             <div className="font-medium">{entry.worker.fullName}</div>

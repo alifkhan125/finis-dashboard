@@ -102,6 +102,7 @@ export function WorkerSchedule({ worker }: { worker?: any }) {
                 day: dayMap[norm] || (d.charAt(0).toUpperCase() + d.slice(1, 3)),
                 start: assignment.schedule.startTime,
                 end: assignment.schedule.endTime,
+                graceMinutes: assignment.schedule.graceMinutes ?? 15,
                 project: assignment.schedule.name,
                 role: worker.role || 'Worker',
                 status: isAdjusted ? 'adjusted' : 'upcoming'
@@ -167,7 +168,7 @@ export function WorkerSchedule({ worker }: { worker?: any }) {
                     // Check if this specific date has an approved single-day adjustment
                     const singleDayAdj = (worker?.timeAdjustments || []).find((adj: any) => {
                         if (adj.status !== 'approved') return false;
-                        const isSingleDay = adj.reason?.includes('Scope: single_day');
+                        const isSingleDay = adj.kind === 'shift_change' && adj.scope === 'single_day';
                         if (!isSingleDay) return false;
                         const adjDateStr = new Date(adj.date).toISOString().split('T')[0];
                         return adjDateStr === dateKey;
@@ -179,11 +180,13 @@ export function WorkerSchedule({ worker }: { worker?: any }) {
 
                     if (singleDayAdj) {
                         isSingleDayAdjusted = true;
+                        overrideStart = singleDayAdj.startTime || null;
+                        overrideEnd = singleDayAdj.endTime || null;
                         const match = singleDayAdj.reason?.match(/\[Time:\s*([^\]]+)\]/);
                         const timeStr = match ? match[1] : new Date(singleDayAdj.adjustedTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-                        if (singleDayAdj.requestType === 'check_in') {
+                        if (!overrideStart && singleDayAdj.requestType === 'check_in') {
                             overrideStart = timeStr;
-                        } else {
+                        } else if (!overrideEnd) {
                             overrideEnd = timeStr;
                         }
                     }

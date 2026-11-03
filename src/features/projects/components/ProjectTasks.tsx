@@ -16,6 +16,27 @@ import { Dropdown } from '@/shared/components/ui/Dropdown';
 import { useTasks, useCreateTask, useAssignTask, useUpdateTask, useDeleteTask, useSubTasks, useCreateSubTask, useSubTaskDetails, useUpdateSubTask } from '../hooks/useTasks';
 import { useProjectTeam, useProjectFloors } from '../hooks/useProjects';
 
+function getSubtaskStatusBadge(status?: string, approvalDecision?: string | null) {
+    const normalized = String(status || 'pending').toLowerCase().trim();
+    if (approvalDecision === 'rejected' || normalized === 'revision' || normalized === 'denied') {
+        return { label: 'REVISION', className: 'bg-red-50 text-red-700 border-red-200' };
+    }
+
+    const badges: Record<string, { label: string; className: string }> = {
+        pending: { label: 'PENDING', className: 'bg-amber-50 text-amber-700 border-amber-200' },
+        in_active: { label: 'PENDING', className: 'bg-amber-50 text-amber-700 border-amber-200' },
+        in_progress: { label: 'IN PROGRESS', className: 'bg-blue-50 text-blue-700 border-blue-200' },
+        review: { label: 'REVIEW', className: 'bg-violet-50 text-violet-700 border-violet-200' },
+        completed: { label: 'COMPLETED', className: 'bg-emerald-50 text-emerald-700 border-emerald-200' },
+        cancelled: { label: 'CANCELLED', className: 'bg-gray-100 text-gray-600 border-gray-200' },
+    };
+
+    return badges[normalized] || {
+        label: normalized.replace(/_/g, ' ').toUpperCase(),
+        className: 'bg-gray-100 text-gray-600 border-gray-200',
+    };
+}
+
 export function ProjectTasks() {
     const { id: projectId } = useParams();
     const authUser = useAppSelector(selectAuthUser);
@@ -751,7 +772,17 @@ function ProjectTaskCard({ task, isSuperAdmin, canManageTaskPrice, onEdit, onAss
                             >
                                 <div>
                                     <h5 className="text-xs font-bold text-gray-800">{st.title || (st.task && st.task.title)}</h5>
-                                    <span className="text-[10px] text-gray-500 uppercase font-bold">{st.status || (st.task && st.task.status)}</span>
+                                    {(() => {
+                                        const statusBadge = getSubtaskStatusBadge(
+                                            st.status || (st.task && st.task.status),
+                                            st.approvalDecision,
+                                        );
+                                        return (
+                                            <span className={`mt-1 inline-flex w-fit rounded border px-1.5 py-0.5 text-[10px] font-bold ${statusBadge.className}`}>
+                                                {statusBadge.label}
+                                            </span>
+                                        );
+                                    })()}
                                 </div>
                                 <div className="flex flex-col items-end gap-1">
                                     {(st.units || st.subTaskUnits)?.length > 0 && (

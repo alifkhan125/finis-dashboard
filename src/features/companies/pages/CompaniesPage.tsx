@@ -30,7 +30,7 @@ export function CompaniesPage() {
   const debouncedSearchQuery = useDebounce(searchQuery, 300);
   const [statusFilter, setStatusFilter] = useState('all');
   const [industryFilter, setIndustryFilter] = useState('all');
-  const [timeFilter, setTimeFilter] = useState('monthly');
+  const [timeFilter, setTimeFilter] = useState('all');
   const [customDateRange, setCustomDateRange] = useState<{ start: Date; end: Date } | null>(null);
 
 
@@ -88,6 +88,8 @@ export function CompaniesPage() {
     start.setHours(0, 0, 0, 0);
     const end = new Date(start);
     switch (timeFilter) {
+      case 'all':
+        break;
       case 'today':
       case 'daily':
         end.setDate(end.getDate() + 1);
@@ -114,7 +116,7 @@ export function CompaniesPage() {
         }
         break;
     }
-    const matchesTime = companyDate >= start && companyDate < end;
+    const matchesTime = timeFilter === 'all' || (companyDate >= start && companyDate < end);
 
     return matchesSearch && matchesStatus && matchesIndustry && matchesTime;
   });

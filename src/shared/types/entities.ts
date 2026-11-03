@@ -241,6 +241,10 @@ export interface TimeAdjustmentRequest {
   createdAt: string;
   reviewedAt?: string;
   reviewedBy?: string;
+  kind?: string;
+  scope?: string;
+  startTime?: string;
+  endTime?: string;
 }
 
 export interface Geofence {

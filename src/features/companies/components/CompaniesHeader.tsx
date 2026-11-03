@@ -31,6 +31,7 @@ export function CompaniesHeader({
             <DateRangeFilter
                 onFilterChange={onFilterChange}
                 onCustomDateChange={onCustomDateChange}
+                initialFilter="all"
             />
 
             {canCreate && onCreateCompany && (

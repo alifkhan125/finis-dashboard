@@ -23,6 +23,7 @@ export function DateRangeFilter({ onFilterChange, onCustomDateChange, className,
     const containerRef = useRef<HTMLDivElement>(null);
 
     const filters = [
+        { id: 'all', label: 'All' },
         { id: 'today', label: 'Today' },
         { id: 'weekly', label: 'Weekly' },
         { id: 'monthly', label: 'Monthly' },

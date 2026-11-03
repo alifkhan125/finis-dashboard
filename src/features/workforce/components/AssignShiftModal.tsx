@@ -17,6 +17,8 @@ export function AssignShiftModal({ isOpen, onClose, worker }: AssignShiftModalPr
     const [projectId, setProjectId] = useState('');
     const [startTime, setStartTime] = useState('08:00');
     const [endTime, setEndTime] = useState('17:00');
+    const [graceMinutes, setGraceMinutes] = useState(15);
+    const [effectiveFrom, setEffectiveFrom] = useState(new Date().toLocaleDateString('en-CA'));
     const [selectedDays, setSelectedDays] = useState<string[]>(['mon', 'tue', 'wed', 'thu', 'fri']);
 
     const toggleDay = (d: string) => {
@@ -44,6 +46,8 @@ export function AssignShiftModal({ isOpen, onClose, worker }: AssignShiftModalPr
                 userIds: [workerId],
                 startTime,
                 endTime,
+                graceMinutes,
+                effectiveFrom,
                 days: selectedDays
             });
             window.location.reload(); // Reload to fetch fresh data
@@ -123,6 +127,13 @@ export function AssignShiftModal({ isOpen, onClose, worker }: AssignShiftModalPr
                         </div>
                     </div>
 
+                    <div className="space-y-2">
+                        <Label htmlFor="graceMinutes">Late grace period (minutes)</Label>
+                        <Label htmlFor="shiftEffectiveFrom">Effective from</Label>
+                        <Input id="shiftEffectiveFrom" type="date" required value={effectiveFrom} onChange={e => setEffectiveFrom(e.target.value)} />
+                        <Input id="graceMinutes" type="number" min={0} max={180} step={1} required value={graceMinutes} onChange={e => setGraceMinutes(Number(e.target.value))} />
+                        <p className="text-xs text-gray-500">Check-in after shift start plus this grace period counts as late.</p>
+                    </div>
                     <div className="space-y-2">
                         <Label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Working Days</Label>
                         <div className="flex flex-wrap gap-2">

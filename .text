@@ -1,0 +1,5 @@
+cd /var/www/finis-backend && npx prisma db push --force-reset && npm run seed && pm2 restart finis-backend
+
+
+
+npm run seed

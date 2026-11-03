@@ -21,6 +21,82 @@ function normalizeBody(body: PublicContentPage['body']) {
   return typeof body === 'string' ? body : JSON.stringify(body, null, 2);
 }
 
+function escapeLegalText(value: string) {
+  return value
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;')
+    .replace(/'/g, '&#39;');
+}
+
+function normalizeLegalBody(body: PublicContentPage['body']) {
+  const raw = normalizeBody(body).trim();
+  if (!raw) return '';
+  if (!raw.includes('<')) return raw;
+
+  const text = raw
+    .replace(/<br\s*\/?>/gi, '\n')
+    .replace(/<li[^>]*>/gi, '• ')
+    .replace(/<\/(p|div|blockquote|pre|code|h1|h2|h3|li)>/gi, '\n')
+    .replace(/<[^>]+>/g, '')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;/gi, "'")
+    .replace(/\r\n?/g, '\n')
+    .replace(/\s*•\s*/g, '\n• ')
+    .replace(/\s+(?=(Company|Address|Email|Phone):)/g, '\n')
+    .replace(/(?<=[\]\w.])(?=(Company|Address|Email|Phone):)/g, '\n')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+
+  const lines = text.split('\n').map((line) => line.trim());
+  const blocks: string[] = [];
+  let paragraph: string[] = [];
+  let bullets: string[] = [];
+
+  const flushParagraph = () => {
+    if (!paragraph.length) return;
+    blocks.push(`<p>${paragraph.map(escapeLegalText).join('<br>')}</p>`);
+    paragraph = [];
+  };
+
+  const flushBullets = () => {
+    if (!bullets.length) return;
+    blocks.push(`<ul>${bullets.map((item) => `<li>${escapeLegalText(item)}</li>`).join('')}</ul>`);
+    bullets = [];
+  };
+
+  for (const line of lines) {
+    if (!line) {
+      flushParagraph();
+      flushBullets();
+      continue;
+    }
+    if (line.startsWith('•')) {
+      flushParagraph();
+      bullets.push(line.slice(1).trim());
+      continue;
+    }
+    flushBullets();
+    if (/^\d+\.\s+[A-Z][A-Z\s'&-]+$/.test(line)) {
+      flushParagraph();
+      blocks.push(`<h3>${escapeLegalText(line)}</h3>`);
+    } else if (/^(Company|Address|Email|Phone):/i.test(line)) {
+      flushParagraph();
+      const separator = line.indexOf(':');
+      blocks.push(`<p><strong>${escapeLegalText(line.slice(0, separator + 1))}</strong>${escapeLegalText(line.slice(separator + 1))}</p>`);
+    } else {
+      paragraph.push(line);
+    }
+  }
+
+  flushParagraph();
+  flushBullets();
+  return blocks.join('');
+}
+
 function normalizeSections(sections: PublicContentPage['sections']) {
   if (!sections) return [];
   return Array.isArray(sections) ? sections : [];
@@ -96,7 +172,7 @@ function RichTextEditor({ content, onChange, placeholder = 'Write content here..
         contentEditable
         suppressContentEditableWarning
         data-placeholder={placeholder}
-        className="prose min-h-[150px] max-w-none p-4 text-sm leading-7 text-gray-800 outline-none empty:before:pointer-events-none empty:before:text-gray-400 empty:before:content-[attr(data-placeholder)] prose-headings:mb-2 prose-headings:mt-3 prose-li:my-1 prose-ol:pl-6 prose-ul:pl-6"
+        className="legal-document legal-editor min-h-[150px] max-w-none overflow-x-hidden p-4 outline-none empty:before:pointer-events-none empty:before:text-gray-400 empty:before:content-[attr(data-placeholder)]"
         onInput={(e) => onChange(e.currentTarget.innerHTML)}
       />
       <div className="flex items-center justify-between border-t border-gray-100 px-4 py-2 text-[10px] font-medium text-gray-400">
@@ -138,6 +214,11 @@ export function PublicContentEditorPage() {
   const [openFaqIndex, setOpenFaqIndex] = useState<number | null>(0);
   const [isEditing, setIsEditing] = useState(false);
 
+  const displayHtml = useMemo(
+    () => (isLegalPage ? normalizeLegalBody(pageHtml) : pageHtml),
+    [isLegalPage, pageHtml],
+  );
+
   useEffect(() => {
     const nextMeta = pageMeta[slug] ?? pageMeta['about-us'];
     const html = '<p>Write your page content here...</p>';
@@ -156,7 +237,9 @@ export function PublicContentEditorPage() {
 
   useEffect(() => {
     if (!activePage) return;
-    const html = normalizeBody(activePage.body) || '<p>Write your page content here...</p>';
+    const html = (activePage.slug === 'privacy-policy' || activePage.slug === 'terms-and-conditions'
+      ? normalizeLegalBody(activePage.body)
+      : normalizeBody(activePage.body)) || '<p>Write your page content here...</p>';
     setPageForm({
       slug: activePage.slug,
       title: activePage.title,
@@ -201,6 +284,9 @@ export function PublicContentEditorPage() {
   }, [isEditing]);
 
   const handleEditToggle = () => {
+    if (!isEditing && isLegalPage) {
+      setPageHtml(normalizeLegalBody(pageHtml));
+    }
     setIsEditing((current) => !current);
   };
 
@@ -393,8 +479,8 @@ export function PublicContentEditorPage() {
                 </div>
               </div>
             ) : (
-              <div className="mx-auto mt-8 min-h-[900px] max-w-[850px] rounded-sm border border-gray-200 bg-white px-10 py-12 shadow-[0_4px_24px_rgba(15,23,42,0.10)] md:px-20 md:py-16">
-                <div className="prose max-w-none text-left prose-headings:text-gray-900 prose-li:my-1 prose-ol:pl-6 prose-p:leading-8 prose-p:text-gray-700 prose-ul:pl-6" dangerouslySetInnerHTML={{ __html: pageHtml || '<p>No document content available.</p>' }} />
+                <div className="mx-auto mt-8 min-h-[900px] max-w-[850px] overflow-x-hidden rounded-sm border border-gray-200 bg-white px-10 py-12 shadow-[0_4px_24px_rgba(15,23,42,0.10)] md:px-20 md:py-16">
+                <div className="legal-document max-w-none overflow-x-hidden text-left" dangerouslySetInnerHTML={{ __html: displayHtml || '<p>No document content available.</p>' }} />
               </div>
             )
           ) : (

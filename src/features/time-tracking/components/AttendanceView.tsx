@@ -8,6 +8,7 @@ import { Table, Column } from '@/shared/components/ui/Table';
 import { Modal } from '@/shared/components/ui/Modal';
 import { SuperAdminAttendanceRecord } from '@/shared/types';
 import { formatStatus } from '@/shared/utils';
+import { AttendanceBreakdown } from './AttendanceBreakdown';
 
 type Props = {
     attendance: SuperAdminAttendanceRecord[];
@@ -121,7 +122,7 @@ export function AttendanceView({
                 <div className="flex items-center gap-2">
                     <div className={`h-2 w-2 rounded-full ${record.session?.checkOutTime ? 'bg-[#1D4F6D]' : 'bg-amber-400 animate-pulse'}`} />
                     <span className="text-sm font-bold text-gray-800">
-                        {record.session?.checkOutTime ? new Date(record.session.checkOutTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : 'Ongoing'}
+                        {record.session?.checkOutTime ? new Date(record.session.checkOutTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : record.session?.checkInTime ? 'Ongoing' : '—'}
                     </span>
                 </div>
             )
@@ -136,7 +137,7 @@ export function AttendanceView({
             key: 'status',
             header: 'Status',
             render: (record) => (
-                <Badge variant={record.status === 'present' ? 'success' : record.status === 'late' ? 'warning' : 'destructive'} className="font-bold capitalize text-[10px]">
+                <Badge variant={record.status === 'present' ? 'success' : record.status === 'late' ? 'warning' : record.status === 'absent' ? 'destructive' : 'secondary'} className="font-bold capitalize text-[10px]">
                     {formatStatus(record.status)}
                 </Badge>
             )
@@ -378,6 +379,7 @@ export function AttendanceView({
                             </div>
                         </div>
 
+                        <AttendanceBreakdown calculation={selectedRecordDetail.calculation} />
                         {selectedRecordDetail.session?.inLat && selectedRecordDetail.session?.inLng && (
                             <div className="p-3 bg-blue-50/60 border border-blue-100 rounded-xl flex items-center justify-between">
                                 <div className="flex items-center gap-2 text-xs text-gray-700">

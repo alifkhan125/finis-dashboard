@@ -10,6 +10,7 @@ import { Button } from '@/shared/components/ui/Button';
 import { useGetAttendanceRecordsQuery, useGetAttendanceSummaryQuery } from '@/store/dashboardApi';
 import type { SuperAdminAttendanceRecord } from '@/shared/types';
 import { formatStatus } from '@/shared/utils';
+import { AttendanceBreakdown } from '../components/AttendanceBreakdown';
 
 export function AttendancePage() {
     const today = new Date();
@@ -22,7 +23,7 @@ export function AttendancePage() {
     const [statusFilter, setStatusFilter] = useState('all');
 
     const { data: summaryData } = useGetAttendanceSummaryQuery({ date: selectedDate });
-    const { data: recordsData, isLoading: isRecordsLoading } = useGetAttendanceRecordsQuery({ date: selectedDate, limit: 200 });
+    const { data: recordsData, isLoading: isRecordsLoading } = useGetAttendanceRecordsQuery({ date: selectedDate, limit: 100 }, { pollingInterval: 15000 });
 
     const records: SuperAdminAttendanceRecord[] = Array.isArray(recordsData)
         ? recordsData
@@ -33,7 +34,9 @@ export function AttendancePage() {
         present: records.filter(r => r.status === 'present' || r.status === 'late').length,
         late: records.filter(r => r.status === 'late').length,
         absent: records.filter(r => r.status === 'absent').length,
+        leave: records.filter(r => r.status === 'leave').length,
         activeCheckIns: records.filter(r => Boolean(r.session && !r.session.checkOutTime)).length,
+        totalHours: records.reduce((sum, r) => sum + (r.totalHours ?? 0), 0),
         attendanceRate: records.length > 0 ? Math.round((records.filter(r => r.status === 'present').length / records.length) * 100) : 0,
     };
 
@@ -48,13 +51,21 @@ export function AttendancePage() {
     }, [records, searchQuery, statusFilter]);
 
     const stats = [
+        { label: 'Total Employees', value: String(statsData.total), icon: CheckCircle2, color: 'text-slate-600', bg: 'bg-slate-50' },
         { label: 'Total Present', value: String(statsData.present), icon: CheckCircle2, color: 'text-green-600', bg: 'bg-green-50' },
         { label: 'Late Arrivals', value: String(statsData.late), icon: AlertTriangle, color: 'text-yellow-600', bg: 'bg-yellow-50' },
         { label: 'Absent', value: String(statsData.absent), icon: XCircle, color: 'text-red-600', bg: 'bg-red-50' },
+        { label: 'On Leave', value: String(statsData.leave ?? records.filter(r => r.status === 'leave').length), icon: Clock, color: 'text-purple-600', bg: 'bg-purple-50' },
         { label: 'Active Check-Ins', value: String(statsData.activeCheckIns), icon: Clock, color: 'text-blue-600', bg: 'bg-blue-50' },
+        { label: 'Total Hours', value: `${Number(statsData.totalHours ?? 0).toFixed(1)} hrs`, icon: Clock, color: 'text-indigo-600', bg: 'bg-indigo-50' },
+        { label: 'Attendance Rate', value: `${Number(statsData.attendanceRate ?? 0).toFixed(1)}%`, icon: CheckCircle2, color: 'text-teal-600', bg: 'bg-teal-50' },
     ];
 
     const columns: Column<SuperAdminAttendanceRecord>[] = [
+        {
+            key: 'activity', header: 'Activity',
+            render: record => <details className="min-w-[220px]"><summary className="cursor-pointer text-blue-700">Sessions & working time</summary><div className="mt-3"><AttendanceBreakdown calculation={record.calculation} /></div></details>,
+        },
         {
             key: 'worker',
             header: 'Worker Registry',
@@ -107,7 +118,7 @@ export function AttendancePage() {
                 <div className="flex items-center gap-2">
                     <div className={`h-2 w-2 rounded-full ${record.session?.checkOutTime ? 'bg-[#1D4F6D]' : 'bg-gray-300 animate-pulse'}`} />
                     <span className="text-sm font-bold text-gray-700">
-                        {record.session?.checkOutTime ? new Date(record.session.checkOutTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : 'In Progress'}
+                        {record.session?.checkOutTime ? new Date(record.session.checkOutTime).toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true }) : record.session?.checkInTime ? 'In Progress' : '—'}
                     </span>
                 </div>
             )
@@ -231,6 +242,8 @@ export function AttendancePage() {
                                 { value: 'present', label: 'Present' },
                                 { value: 'late', label: 'Late' },
                                 { value: 'absent', label: 'Absent' },
+                                { value: 'leave', label: 'On Leave' },
+                                { value: 'not_checked_in', label: 'Not checked in' },
                                 { value: 'half_day', label: 'Half Day' }
                             ]}
                             className="w-40 bg-white rounded-xl text-sm"

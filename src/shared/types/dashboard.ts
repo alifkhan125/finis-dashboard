@@ -126,6 +126,7 @@ export interface SuperAdminAttendanceRecord {
     date: string;
     status: 'present' | 'late' | 'absent' | string;
     totalHours: number;
+    calculation?: Record<string, any>;
     worker: {
         id: string;
         fullName: string;
@@ -149,7 +150,9 @@ export interface SuperAdminAttendanceSummary {
     present: number;
     late: number;
     absent: number;
+    leave: number;
     activeCheckIns: number;
+    totalHours: number;
     attendanceRate: number;
 }
 

@@ -18,12 +18,15 @@ export function EditShiftModal({ isOpen, onClose, shift, worker }: EditShiftModa
     const [isDeleting, setIsDeleting] = useState(false);
     const [startTime, setStartTime] = useState('08:00');
     const [endTime, setEndTime] = useState('17:00');
+    const [graceMinutes, setGraceMinutes] = useState(15);
+    const [effectiveFrom, setEffectiveFrom] = useState(new Date().toLocaleDateString('en-CA'));
     const [selectedDays, setSelectedDays] = useState<string[]>(['mon', 'tue', 'wed', 'thu', 'fri']);
 
     useEffect(() => {
         if (shift) {
             setStartTime(shift.start || '08:00');
             setEndTime(shift.end || '17:00');
+            setGraceMinutes(shift.graceMinutes ?? 15);
             if (shift.days && Array.isArray(shift.days) && shift.days.length > 0) {
                 setSelectedDays(shift.days.map((d: string) => d.slice(0, 3).toLowerCase()));
             }
@@ -53,6 +56,9 @@ export function EditShiftModal({ isOpen, onClose, shift, worker }: EditShiftModa
             await apiClient.patch(`/admin/projects/${projectId || 'default'}/schedule/${shift.scheduleId}`, {
                 startTime,
                 endTime,
+                graceMinutes,
+                effectiveFrom,
+                userId: worker.userId || worker.id,
                 days: selectedDays
             });
             window.location.reload();
@@ -142,6 +148,12 @@ export function EditShiftModal({ isOpen, onClose, shift, worker }: EditShiftModa
                         </div>
                     </div>
 
+                    <div className="space-y-2">
+                        <Label htmlFor="editGraceMinutes">Late grace period (minutes)</Label>
+                        <Label htmlFor="editEffectiveFrom">Effective from (saved attendance will be recalculated)</Label>
+                        <Input id="editEffectiveFrom" type="date" required value={effectiveFrom} onChange={e => setEffectiveFrom(e.target.value)} />
+                        <Input id="editGraceMinutes" type="number" min={0} max={180} step={1} required value={graceMinutes} onChange={e => setGraceMinutes(Number(e.target.value))} />
+                    </div>
                     <div className="space-y-2">
                         <Label className="text-[10px] font-black text-gray-400 uppercase tracking-widest">Working Days</Label>
                         <div className="flex flex-wrap gap-2">

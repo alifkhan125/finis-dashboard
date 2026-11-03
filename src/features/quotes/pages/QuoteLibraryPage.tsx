@@ -345,16 +345,9 @@ export function QuoteLibraryPage() {
   const quoteEstimates = quoteEstimateList?.data ?? [];
 
   const { data: builderTemplateWorkItems = [] } = useGetQuoteWorkItemsQuery({
-    projectType: builderInfo.projectType || undefined,
-    propertyType: builderInfo.propertyType || undefined,
-    unitType: builderInfo.unitType || undefined,
     includeInactive: false,
   });
-  const { data: builderTemplateQuoteList } = useGetQuotesQuery({
-    projectType: builderInfo.projectType || undefined,
-    propertyType: builderInfo.propertyType || undefined,
-    unitType: builderInfo.unitType || undefined,
-  });
+  const { data: builderTemplateQuoteList } = useGetQuotesQuery();
   const builderTemplateQuotes = builderTemplateQuoteList?.quotes ?? [];
 
   const [selectedTemplateId, setSelectedTemplateId] = useState<string>('');
@@ -470,15 +463,14 @@ export function QuoteLibraryPage() {
     const suggestions: TaskTemplateSuggestion[] = [];
     const titleKeyMap = new Map<string, number>();
 
-    // 1. Process tasks from matching previous quote estimates
-    const matchingEstimates = quoteEstimates.filter((est) => {
-      const matchProject = !currentProject || !est.projectType || norm(est.projectType) === currentProject;
-      const matchProperty = !currentProperty || !est.propertyType || norm(est.propertyType) === currentProperty;
-      const matchUnit = !currentUnit || !est.unitType || norm(est.unitType) === currentUnit;
-      return matchProject && matchProperty && matchUnit;
+    // 1. Process tasks from previous quote estimates (all quotes, prioritizing matching types)
+    const sortedEstimates = [...quoteEstimates].sort((a, b) => {
+      const aMatch = (!currentProject || norm(a.projectType) === currentProject) && (!currentProperty || norm(a.propertyType) === currentProperty) ? 1 : 0;
+      const bMatch = (!currentProject || norm(b.projectType) === currentProject) && (!currentProperty || norm(b.propertyType) === currentProperty) ? 1 : 0;
+      return bMatch - aMatch;
     });
 
-    for (const est of matchingEstimates) {
+    for (const est of sortedEstimates) {
       for (const task of est.tasks || []) {
         const cleanTitle = (task.title || '').trim();
         if (!cleanTitle) continue;

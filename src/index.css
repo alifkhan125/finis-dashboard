@@ -37,6 +37,64 @@
   }
 }
 
+@layer components {
+  .legal-document {
+    max-width: 100%;
+    overflow-wrap: anywhere;
+    white-space: normal;
+    word-break: break-word;
+    color: #374151;
+    font-size: 0.875rem;
+    line-height: 1.75;
+  }
+
+  .legal-document h1,
+  .legal-document h2,
+  .legal-document h3 {
+    color: #111827;
+    font-weight: 700;
+    line-height: 1.35;
+  }
+
+  .legal-document h1 { margin: 1.5rem 0 0.75rem; font-size: 1.5rem; }
+  .legal-document h2 { margin: 1.5rem 0 0.75rem; font-size: 1.25rem; }
+  .legal-document h3 { margin: 1.5rem 0 0.5rem; font-size: 1rem; }
+  .legal-document h1:first-child,
+  .legal-document h2:first-child,
+  .legal-document h3:first-child { margin-top: 0; }
+
+  .legal-document p {
+    margin: 0 0 1rem;
+    white-space: normal;
+  }
+
+  .legal-document strong,
+  .legal-document b {
+    font-weight: 700;
+    color: #1f2937;
+  }
+
+  .legal-document ul,
+  .legal-document ol {
+    margin: 0.75rem 0 1.25rem;
+    padding-left: 1.5rem;
+  }
+
+  .legal-document li {
+    margin: 0.35rem 0;
+    padding-left: 0.25rem;
+  }
+
+  .legal-document blockquote {
+    margin: 1rem 0;
+    padding: 0.75rem 1rem;
+    border-left: 3px solid #1f5577;
+    background: #eef4f7;
+  }
+
+  .legal-document > :last-child { margin-bottom: 0; }
+}
+
 @layer base {
   * {
     @apply border-gray-200;

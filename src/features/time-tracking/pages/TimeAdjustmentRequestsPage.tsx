@@ -8,6 +8,8 @@ import { Modal } from '@/shared/components/ui/Modal';
 import { Avatar, AvatarFallback, AvatarImage } from '@/shared/components/ui/Avatar';
 import { apiClient, API_ENDPOINTS } from '@/services';
 import { TimeAdjustmentRequest } from '@/shared/types';
+import { useAppSelector } from '@/store/hooks';
+import { selectAuthUser } from '@/store/authSlice';
 import { getStatusColor, formatStatus, capitalize, cn } from '@/shared/utils';
 
 function formatAMPM(dateOrStr?: string | Date | null): string {
@@ -37,6 +39,8 @@ function cleanReasonText(reason?: string): string {
 }
 
 export function TimeAdjustmentRequestsPage({ embedded = false }: { embedded?: boolean }) {
+    const role = useAppSelector(selectAuthUser)?.role;
+    const canReview = role === 'admin' || role === 'super_admin';
     const [requests, setRequests] = useState<TimeAdjustmentRequest[]>([]);
     const [selectedRequest, setSelectedRequest] = useState<TimeAdjustmentRequest | null>(null);
     const [showDetailModal, setShowDetailModal] = useState(false);
@@ -51,12 +55,16 @@ export function TimeAdjustmentRequestsPage({ embedded = false }: { embedded?: bo
             const list = Array.isArray(raw) ? raw : [];
             const mapped: TimeAdjustmentRequest[] = list.map((item: any) => ({
                 id: item.id,
+                kind: item.kind,
+                scope: item.scope,
+                startTime: item.startTime,
+                endTime: item.endTime,
                 workerId: item.workerId,
                 workerName: item.worker?.fullName || item.workerName || 'Worker',
                 date: item.date ? new Date(item.date).toISOString().split('T')[0] : new Date().toISOString().split('T')[0],
                 requestType: item.requestType || 'check_in',
                 originalTime: formatAMPM(item.originalTime),
-                requestedTime: extractRequestedTime(item.reason, item.adjustedTime),
+                requestedTime: item.kind === 'shift_change' && item.startTime && item.endTime ? `${item.startTime} – ${item.endTime}` : extractRequestedTime(item.reason, item.adjustedTime),
                 reason: cleanReasonText(item.reason),
                 rawReason: item.reason || '',
                 status: item.status || 'pending',
@@ -136,11 +144,11 @@ export function TimeAdjustmentRequestsPage({ embedded = false }: { embedded?: bo
             key: 'requestType',
             header: 'Type',
             render: (record: any) => {
-                const isSingleDay = record.rawReason?.includes('Scope: single_day') || record.reason?.includes('Scope: single_day');
+                const isSingleDay = record.scope === 'single_day' || record.rawReason?.includes('Scope: single_day') || record.reason?.includes('Scope: single_day');
                 return (
                     <div className="flex flex-col gap-1 items-start">
                         <Badge variant="secondary">
-                            {record.requestType.replace('_', '-')}
+                            {record.kind === 'shift_change' ? 'Shift change' : record.requestType.replace('_', '-')}
                         </Badge>
                         <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isSingleDay ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
                             {isSingleDay ? '1 Day Only' : 'Regular Shift'}
@@ -177,7 +185,7 @@ export function TimeAdjustmentRequestsPage({ embedded = false }: { embedded?: bo
                     <Button
                         size="sm"
                         className="bg-green-600 hover:bg-green-700 text-white"
-                        disabled={isActionLoading}
+                        disabled={isActionLoading || !canReview}
                         onClick={() => handleApprove(record.id)}
                     >
                         Approve
@@ -185,7 +193,7 @@ export function TimeAdjustmentRequestsPage({ embedded = false }: { embedded?: bo
                     <Button
                         size="sm"
                         variant="destructive"
-                        disabled={isActionLoading}
+                        disabled={isActionLoading || !canReview}
                         onClick={() => handleDeny(record.id)}
                     >
                         Deny
@@ -220,11 +228,11 @@ export function TimeAdjustmentRequestsPage({ embedded = false }: { embedded?: bo
             key: 'requestType',
             header: 'Type',
             render: (record: any) => {
-                const isSingleDay = record.rawReason?.includes('Scope: single_day') || record.reason?.includes('Scope: single_day');
+                const isSingleDay = record.scope === 'single_day' || record.rawReason?.includes('Scope: single_day') || record.reason?.includes('Scope: single_day');
                 return (
                     <div className="flex flex-col gap-1 items-start">
                         <Badge variant="secondary">
-                            {record.requestType.replace('_', '-')}
+                            {record.kind === 'shift_change' ? 'Shift change' : record.requestType.replace('_', '-')}
                         </Badge>
                         <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${isSingleDay ? 'bg-purple-100 text-purple-700' : 'bg-blue-100 text-blue-700'}`}>
                             {isSingleDay ? '1 Day Only' : 'Regular Shift'}
@@ -386,7 +394,7 @@ export function TimeAdjustmentRequestsPage({ embedded = false }: { embedded?: bo
                             <Button variant="outline" onClick={() => setShowDetailModal(false)}>
                                 Close
                             </Button>
-                            {selectedRequest.status === 'pending' && (
+                            {selectedRequest.status === 'pending' && canReview && (
                                 <>
                                     <Button
                                         variant="destructive"
